@@ -175,6 +175,34 @@ public static class Effects
         return output;
     }
 
+    /// <summary>
+    /// One color for the whole device that follows the revs, for flag devices in games
+    /// without flags: the gauge color at the current revs (green, yellow, orange, red),
+    /// brightening from 25% at idle to full at the shift point; solid red at the shift
+    /// point, flashing past the blink point, alternating on the pit limiter.
+    /// </summary>
+    public static Rgb[] RevColors(int n, Sample s, TachStyle style, double now, double? learnedMax = null)
+    {
+        if (n <= 0) return [];
+        double rpm = double.IsFinite(s.Rpm) ? s.Rpm : 0.0;
+        var (first, shift, blink) = GaugePoints(s, style, learnedMax);
+        Rgb color;
+        if (s.PitLimiter && style.PitLimiter)
+            color = Square(now, style.LimiterHz) ? style.LimiterColor : Rgb.Off;
+        else if (rpm >= blink && blink > shift)
+            color = Square(now, style.BlinkHz) ? style.ShiftColor : Rgb.Off;
+        else if (rpm >= shift || s.ShiftNow)
+            color = style.ShiftColor;
+        else if (rpm <= 0)
+            color = Rgb.Off;    // engine off
+        else
+        {
+            double p = Math.Clamp((rpm - first) / (shift - first), 0.0, 1.0);
+            color = GradientAt(style.Gradient, p).Scale(0.25 + 0.75 * p);
+        }
+        return Enumerable.Repeat(color.Scale(style.Brightness), n).ToArray();
+    }
+
     public static Rgb[] FlagColors(FlagStyle style, int n, double now, double brightness = 1.0)
     {
         if (n <= 0) return [];

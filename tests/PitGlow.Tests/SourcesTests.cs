@@ -135,6 +135,7 @@ public class KunosTests
         var s = src.Read(0.05)!;
         Assert.Equal((6400.0, 7800.0), (s.Rpm, s.MaxRpm!.Value));
         Assert.Empty(s.Flags);
+        Assert.False(s.HasFlags);
     }
 
     [Fact]

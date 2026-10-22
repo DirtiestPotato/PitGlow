@@ -149,6 +149,7 @@ public sealed class ACClassicSource(Func<string, IMemoryBlock>? opener = null) :
             Rpm = Math.Max(0, p.Read<int>(20)),
             MaxRpm = top,
             PitLimiter = p.Read<int>(248) == 1,
+            HasFlags = false,
         };
     }
 

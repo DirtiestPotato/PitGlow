@@ -150,6 +150,7 @@ public sealed class BeamNGSource(int port = 4444, string host = "127.0.0.1") : U
             Rpm = rpm,
             ShiftNow = (showLights & DlShift) != 0,
             PitLimiter = (showLights & DlPitSpeed) != 0,
+            HasFlags = false,
         };
     }
 }

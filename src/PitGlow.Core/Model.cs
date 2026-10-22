@@ -53,6 +53,7 @@ public sealed record Sample(string Game)
     public bool ShiftNow { get; init; }      // the game itself says "shift"
     public bool PitLimiter { get; init; }
     public IReadOnlySet<Flag> Flags { get; init; } = PitGlow.Flags.None;
+    public bool HasFlags { get; init; } = true;  // false: the game has no race flags (rally, BeamNG)
 }
 
 /// <summary>A user-facing problem with the settings file.</summary>

@@ -88,6 +88,9 @@ public static class SettingsFile
         cfg.WhenClear = Str(f, "when_clear", "original");
         if (cfg.WhenClear is not ("original" or "off")) Rgb.FromHex(cfg.WhenClear);
         cfg.LingerSeconds = Dbl(f, "linger_seconds", 1.0);
+        cfg.WhenNoFlags = Str(f, "when_no_flags", "rpm");
+        if (cfg.WhenNoFlags is not ("rpm" or "clear"))
+            throw new ConfigException($"[flags] when_no_flags must be \"rpm\" or \"clear\", not \"{cfg.WhenNoFlags}\"");
         if (f.TryGetValue("priority", out var pr))
             cfg.Priority = [.. ((TomlArray)pr).Select(x => Flags.Parse((string)x!))];
         foreach (var (name, value) in Table(f, "style"))
@@ -260,6 +263,8 @@ public static class SettingsFile
             $"brightness = {N(cfg.FlagBrightness)}",
             "# What flag devices show when no flag is out: original | off | #RRGGBB",
             $"when_clear = {S(cfg.WhenClear)}",
+            "# In games without race flags (AC Rally, BeamNG): rpm = show the rev color, clear = as above",
+            $"when_no_flags = {S(cfg.WhenNoFlags)}",
             "# Keep a flag up this long after it clears, to avoid flicker.",
             $"linger_seconds = {N(cfg.LingerSeconds)}",
             "# When several flags are out, the first one in this list wins.",

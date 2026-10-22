@@ -14,6 +14,8 @@ Free, open-source sim-racing lights for the RGB you already own. Your fans becom
 | Wreckfest 2 | ✅ | ✅ (enable telemetry below) |
 | BeamNG.drive | ✅ | – (enable OutGauge below) |
 
+In games without flags (–), the flag devices glow with the rev color instead: green at idle, through yellow and orange, red at the shift point. Set `when_no_flags = "clear"` under `[flags]` to turn that off.
+
 PitGlow watches for all of them and follows whichever one you're driving.
 
 ## Setup

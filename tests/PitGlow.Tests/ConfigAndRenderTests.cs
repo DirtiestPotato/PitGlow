@@ -208,6 +208,35 @@ public class RenderTests
     }
 
     [Fact]
+    public void GamesWithoutFlagsShowRevColorsOnFlagDevices()
+    {
+        var r = new Renderer(_cfg);
+        var gpu = For("MSI GeForce RTX 5090 VANGUARD SOC");
+        var ram = For("Kingston Fury DDR5 DRAM");
+        Sample Rally(double rpm) => new("rally") { Rpm = rpm, IdleRpm = 1000, ShiftRpm = 8000, MaxRpm = 8500, HasFlags = false };
+        var low = Rally(1500);
+        r.Update(low, 0);
+        var c = r.Frame(gpu, low, 0)[0];
+        Assert.True(c.G > 0 && c.R < c.G && c.G < 128);              // dim green near idle
+        var high = Rally(7600);
+        r.Update(high, 0.1);
+        c = r.Frame(gpu, high, 0.1)[0];
+        Assert.True(c.R > 200 && c.G < 120);                          // orange-red, bright, near the shift point
+        Assert.All(r.Frame(ram, high, 0.1), x => Assert.Equal(c, x));  // whole device one color
+        var shift = Rally(8100);
+        Assert.Equal(new Rgb(255, 0, 0), r.Frame(gpu, shift, 0.2)[0]);
+        Assert.All(r.Frame(ram, shift, 0.01), x => Assert.Equal(new Rgb(255, 255, 255), x));   // shift alert still wins
+        // iRacing-style games with flags keep the normal "no flag" look.
+        var iracing = high with { HasFlags = true };
+        Assert.Equal(gpu.Info.OriginalColors, r.Frame(gpu, iracing, 0.3));
+        // And it can be turned off.
+        var cfg = SettingsFile.Parse("[flags]\nwhen_no_flags = \"clear\"\n");
+        Assert.Equal("clear", cfg.WhenNoFlags);
+        Assert.Equal("rpm", SettingsFile.Parse(SettingsFile.ToToml(_cfg)).WhenNoFlags);
+        Assert.Throws<ConfigException>(() => SettingsFile.Parse("[flags]\nwhen_no_flags = \"rainbow\"\n"));
+    }
+
+    [Fact]
     public void LearnsMaxRpmWhenGameHasNone()
     {
         var r = new Renderer(_cfg);

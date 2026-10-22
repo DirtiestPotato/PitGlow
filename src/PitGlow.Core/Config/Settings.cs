@@ -60,6 +60,8 @@ public sealed class Settings
     public TachStyle Tach { get; set; } = new();
     public double FlagBrightness { get; set; } = 1.0;
     public string WhenClear { get; set; } = "original";   // original | off | #RRGGBB
+    /// <summary>What flag devices show in games without race flags: "rpm" (rev color) or "clear".</summary>
+    public string WhenNoFlags { get; set; } = "rpm";
     public double LingerSeconds { get; set; } = 1.0;
     /// <summary>How devices with shift_alert = true flash at the shift point.</summary>
     public FlagStyle ShiftAlertStyle { get; set; } = new(FlagPattern.Flash, [new(255, 255, 255)], 8.0);
