@@ -1,0 +1,173 @@
+# Potato PitGlow settings. Edit, save, and restart PitGlow.
+# Colors are #RRGGBB. Brightness is 0.0 - 1.0. hz = flashes per second.
+
+[openrgb]
+# OpenRGB > SDK Server tab must be running.
+host = "127.0.0.1"
+port = 6742
+
+[game]
+# auto | iracing | acevo | acrally | wreckfest2 | beamng | demo
+source = "auto"
+wreckfest2_port = 23123
+beamng_port = 4444
+
+[tach]
+# Color of each LED by its position on the dial (0.0 = first LED, 1.0 = last).
+gradient = [[0.0, "#00FF00"], [0.55, "#FFFF00"], [0.8, "#FF5A00"], [1.0, "#FF0000"]]
+# Whole ring turns this color at the shift point, then flashes at blink_hz.
+shift_color = "#FF0000"
+blink_hz = 8.0
+brightness = 1.0
+# Fade the leading LED in, for a smoother needle.
+smooth = true
+# Used only when a game does not provide the car's shift-light points (% of max RPM).
+start_pct = 0.6
+shift_pct = 0.93
+blink_pct = 0.98
+# Pit limiter on: fans alternate halves in limiter_color.
+pit_limiter = true
+limiter_color = "#0050FF"
+limiter_hz = 2.0
+
+[flags]
+brightness = 1.0
+# What flag devices show when no flag is out: original | off | #RRGGBB
+when_clear = "original"
+# Keep a flag up this long after it clears, to avoid flicker.
+linger_seconds = 1.0
+# When several flags are out, the first one in this list wins.
+priority = ["RED", "DISQUALIFIED", "BLACK", "MEATBALL", "FULL_COURSE_YELLOW", "YELLOW", "BLACK_WHITE", "CHECKERED", "DEBRIS", "BLUE", "WHITE", "GREEN"]
+
+# pattern: solid | flash | pulse | swap (neighbouring LEDs alternate two colors)
+# hold_seconds: stop showing the flag this long after it appears (0 = while active)
+[flags.style.GREEN]
+pattern = "flash"
+colors = ["#00FF00"]
+hz = 2.0
+hold_seconds = 6.0
+
+[flags.style.YELLOW]
+pattern = "flash"
+colors = ["#FFAA00"]
+hz = 2.0
+hold_seconds = 0.0
+
+[flags.style.FULL_COURSE_YELLOW]
+pattern = "flash"
+colors = ["#FFAA00"]
+hz = 4.0
+hold_seconds = 0.0
+
+[flags.style.BLUE]
+pattern = "pulse"
+colors = ["#003CFF"]
+hz = 1.0
+hold_seconds = 0.0
+
+[flags.style.WHITE]
+pattern = "solid"
+colors = ["#FFFFFF"]
+hz = 0.0
+hold_seconds = 0.0
+
+[flags.style.CHECKERED]
+pattern = "swap"
+colors = ["#FFFFFF", "#000000"]
+hz = 2.0
+hold_seconds = 0.0
+
+[flags.style.RED]
+pattern = "solid"
+colors = ["#FF0000"]
+hz = 0.0
+hold_seconds = 0.0
+
+[flags.style.BLACK]
+pattern = "swap"
+colors = ["#FFFFFF", "#FF0000"]
+hz = 1.5
+hold_seconds = 0.0
+
+[flags.style.BLACK_WHITE]
+pattern = "swap"
+colors = ["#FFFFFF", "#000000"]
+hz = 1.0
+hold_seconds = 0.0
+
+[flags.style.MEATBALL]
+pattern = "pulse"
+colors = ["#FF4600"]
+hz = 1.0
+hold_seconds = 0.0
+
+[flags.style.DISQUALIFIED]
+pattern = "flash"
+colors = ["#FF0000"]
+hz = 5.0
+hold_seconds = 0.0
+
+[flags.style.DEBRIS]
+pattern = "swap"
+colors = ["#FF0000", "#FFC800"]
+hz = 2.0
+hold_seconds = 0.0
+
+# ---------------------------------------------------------------------------
+# Devices. role: tach (RPM gauge) | flags | ignore
+# A device with a role uses all its LEDs; otherwise each zone has its own role.
+# start_led / reverse: where the gauge starts on each fan and which way it
+# sweeps. Set them with:  python -m pitglow calibrate
+# max_fps: cap on updates per second for that device.
+# ---------------------------------------------------------------------------
+
+[[device]]
+name = "Kingston Fury DDR5 RGB"
+index = 0
+role = "flags"
+max_fps = 10
+
+[[device]]
+name = "Corsair Commander Core"
+index = 0
+max_fps = 20
+
+  [[device.zone]]
+  zone = "Pump"
+  role = "flags"
+
+  [[device.zone]]
+  zone = "RGB Port 1"
+  role = "tach"
+  start_led = 4
+  reverse = false
+
+  [[device.zone]]
+  zone = "RGB Port 2"
+  role = "tach"
+  start_led = 6
+  reverse = true
+
+  [[device.zone]]
+  zone = "RGB Port 3"
+  role = "tach"
+  start_led = 6
+  reverse = true
+
+  [[device.zone]]
+  zone = "RGB Port 4"
+  role = "tach"
+  start_led = 6
+  reverse = true
+
+  [[device.zone]]
+  zone = "RGB Port 5"
+  role = "tach"
+  start_led = 6
+  reverse = true
+
+  [[device.zone]]
+  zone = "RGB Port 6"
+  role = "tach"
+  start_led = 6
+  reverse = true

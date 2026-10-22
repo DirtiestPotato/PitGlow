@@ -1,0 +1,61 @@
+using PitGlow.Config;
+using PitGlow.Devices;
+
+namespace PitGlow.Engine;
+
+/// <summary>A sensible first config from whatever the backend reports.</summary>
+public static class Suggest
+{
+    private static bool IsFanZone(string name)
+    {
+        var n = name.ToLowerInvariant();
+        return n.Contains("port") || n.Contains("fan");
+    }
+
+    public static Settings Config(IEnumerable<DeviceInfo> infos)
+    {
+        var cfg = new Settings();
+        foreach (var info in infos)
+        {
+            var name = info.Name.ToLowerInvariant();
+            if (info.Kind == DeviceKind.Gpu)
+            {
+                cfg.Devices.Add(Whole(info, 30));
+            }
+            else if (info.Kind == DeviceKind.Dram)
+            {
+                cfg.Devices.Add(Whole(info, 10));
+            }
+            else if (info.Kind == DeviceKind.Cooler || name.Contains("commander"))
+            {
+                var zones = new List<ZoneCfg>();
+                foreach (var zone in info.Zones)
+                {
+                    string role;
+                    if (zone.Leds.Count == 0) role = Roles.Ignore;
+                    else if (zone.Name.Contains("pump", StringComparison.OrdinalIgnoreCase)) role = Roles.Flags;
+                    else if (IsFanZone(zone.Name)) role = Roles.Tach;
+                    else role = Roles.Ignore;
+                    // Empty fan headers still get a tach role, so they light up once sized in OpenRGB.
+                    if (zone.Leds.Count == 0 && IsFanZone(zone.Name)) role = Roles.Tach;
+                    zones.Add(new ZoneCfg { Zone = zone.Name, Role = role, Index = zone.Index });
+                }
+                double fps = name.Contains("commander") ? 20 : 30;
+                if (zones.Any(z => z.Role == Roles.Tach))
+                    cfg.Devices.Add(new DeviceCfg { Name = info.Name, Index = info.Occurrence, MaxFps = fps, Location = Loc(info), Zones = zones });
+                else   // a cooler with no fan ports: treat the whole thing as a flag light
+                    cfg.Devices.Add(Whole(info, fps));
+            }
+            else if (info.Kind == DeviceKind.Mouse)
+            {
+                cfg.Devices.Add(Whole(info, 20));
+            }
+        }
+        return cfg;
+    }
+
+    private static string? Loc(DeviceInfo info) => string.IsNullOrEmpty(info.Location) ? null : info.Location;
+
+    private static DeviceCfg Whole(DeviceInfo info, double fps) =>
+        new() { Name = info.Name, Index = info.Occurrence, Role = Roles.Flags, MaxFps = fps, Location = Loc(info) };
+}

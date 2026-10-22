@@ -1,0 +1,44 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Test
+        run: dotnet test tests/PitGlow.Tests/PitGlow.Tests.csproj -c Release --logger "console;verbosity=normal" --logger "trx;LogFileName=results.trx"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: tests/PitGlow.Tests/TestResults/*.trx
+
+      - name: Publish PitGlow.exe
+        run: dotnet publish src/PitGlow.Cli/PitGlow.Cli.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=none -o publish
+
+      - name: Add launchers and docs
+        shell: pwsh
+        run: |
+          Copy-Item packaging/*.bat publish/
+          Copy-Item README.md publish/
+          Copy-Item LICENSE publish/LICENSE.txt
+          Get-ChildItem publish
+
+      - name: Upload PitGlow
+        uses: actions/upload-artifact@v4
+        with:
+          name: PitGlow-win-x64
+          path: publish/

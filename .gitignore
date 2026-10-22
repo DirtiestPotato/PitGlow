@@ -1,0 +1,10 @@
+bin/
+obj/
+publish/
+TestResults/
+*.user
+.vs/
+.vscode/
+pitglow.log
+pitglow.toml
+!tests/PitGlow.Tests/Fixtures/*.toml
