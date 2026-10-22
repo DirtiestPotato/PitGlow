@@ -45,7 +45,7 @@ public static class SettingsFile
         cfg.Game = new GameCfg
         {
             Source = Str(game, "source", "auto"),
-            Wreckfest2Port = Int(game, "wreckfest2_port", 23123),
+            Wreckfest2Port = Int(game, "wreckfest2_port", 23124),
             BeamngPort = Int(game, "beamng_port", 4444),
         };
         if (!GameCfg.Sources.Contains(cfg.Game.Source))

@@ -84,7 +84,7 @@ public abstract class UdpSource(int port, string host) : ITelemetrySource
 /// Wreckfest 2. Enable in Documents\My Games\Wreckfest 2\&lt;id&gt;\savegame\telemetry\config.json.
 /// Packet layout: TelemetryDataFormatPino.h (pack 1), Main packet = type 0.
 /// </summary>
-public sealed class Wreckfest2Source(int port = 23123, string host = "127.0.0.1") : UdpSource(port, host)
+public sealed class Wreckfest2Source(int port = 23124, string host = "127.0.0.1") : UdpSource(port, host)
 {
     public const uint Signature = 1869769584;
     public const int MainMinSize = 1092;

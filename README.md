@@ -32,7 +32,14 @@ PitGlow watches for all of them and follows whichever one you're driving.
 **Devices.bat** lists everything OpenRGB reports, with each zone's LED count.
 
 ### Wreckfest 2
-In `Documents\My Games\Wreckfest 2\<your id>\savegame\telemetry\config.json`, set the `udp` entry to `"enabled": 1`, IP `127.0.0.1`, port `23123`.
+In `Documents\My Games\Wreckfest 2\<your id>\savegame\telemetry\config.json`, add an entry to the `udp` list for PitGlow on port `23124`. Keep any existing entry (port 23123 is what motion rigs, Sim Racing Studio and SimHub use): the game sends to every entry, so both get the data.
+
+```json
+"udp": [
+    { "enabled": 1, "ip": "127.0.0.1", "port": "23123" },
+    { "enabled": 1, "ip": "127.0.0.1", "port": "23124" }
+],
+```
 
 ### BeamNG.drive
 Options → Other → Protocols → turn on **OutGauge UDP**, IP `127.0.0.1`, port `4444`.

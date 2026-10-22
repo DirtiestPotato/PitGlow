@@ -55,7 +55,7 @@ public sealed class GameCfg
 {
     public static readonly string[] Sources = ["auto", "iracing", "acevo", "acrally", "wreckfest2", "beamng", "demo"];
     public string Source { get; set; } = "auto";
-    public int Wreckfest2Port { get; set; } = 23123;
+    public int Wreckfest2Port { get; set; } = 23124;   // 23123 is left to motion rigs / SimHub
     public int BeamngPort { get; set; } = 4444;
 }
 
