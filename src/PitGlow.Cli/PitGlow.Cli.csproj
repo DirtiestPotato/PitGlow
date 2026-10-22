@@ -1,10 +1,16 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
     <AssemblyName>PitGlow</AssemblyName>
     <RootNamespace>PitGlow.Cli</RootNamespace>
-    <ApplicationIcon></ApplicationIcon>
   </PropertyGroup>
+  <ItemGroup>
+    <!-- Keep WinForms names (Layout, Timer, Label...) out of the shared code's way. -->
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\PitGlow.Core\PitGlow.Core.csproj" />
     <ProjectReference Include="..\PitGlow.OpenRgb\PitGlow.OpenRgb.csproj" />

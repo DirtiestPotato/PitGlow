@@ -26,6 +26,7 @@ public static class Program
         public string? Game;
         public double? Seconds;
         public bool Force;
+        public bool ConsoleOnly;
     }
 
     public static int Main(string[] argv)
@@ -103,6 +104,7 @@ public static class Program
                 case "--game": a.Game = Next(); break;
                 case "--seconds": a.Seconds = double.Parse(Next(), CultureInfo.InvariantCulture); break;
                 case "--force": a.Force = true; break;
+                case "--console": a.ConsoleOnly = true; break;
                 case "-h" or "--help" or "help": a.Command = "help"; break;
                 default: throw new ArgumentException($"Unknown argument: {arg}");
             }
@@ -290,6 +292,39 @@ public static class Program
         var (backend, _, plan, journal) = Prepare(args, cfg);
         var workers = plan.Layouts.ToDictionary(l => l, l => new DeviceWorker(l.Info, () => backend.OpenSession(l.Info), l.Cfg.MaxFps, journal));
         foreach (var w in workers.Values) w.Start();
+        if (OperatingSystem.IsWindows() && !args.ConsoleOnly)
+        {
+            try
+            {
+                var targets = plan.Layouts
+                    .SelectMany(l => l.Groups.Where(g => g.Role == Roles.Tach).Select(g => (Layout: l, Group: g)))
+                    .Select((x, i) => new CalibrationTarget
+                    {
+                        Layout = x.Layout, Group = x.Group,
+                        Zone = x.Layout.Cfg.Zones.First(z => x.Layout.Info.Zone(z.Zone)?.Leds.SequenceEqual(x.Group.Leds) == true),
+                        Title = $"Fan {i + 1}: {x.Layout.Info.Label}",
+                    })
+                    .ToList();
+                if (targets.Count == 0)
+                {
+                    Console.WriteLine("No fans or strips are set to the RPM gauge, so there is nothing to calibrate.");
+                    return 1;
+                }
+                Console.WriteLine("Calibration window is open. Close it with Save (or Cancel) to finish.");
+                if (!CalibrationForm.Run(cfg, plan.Layouts, workers, targets))
+                {
+                    Console.WriteLine("Not saved.");
+                    return 1;
+                }
+                SettingsFile.Save(cfg, args.Config);
+                Console.WriteLine($"Saved to {args.Config}.");
+                return 0;
+            }
+            finally
+            {
+                foreach (var w in workers.Values) w.Stop();
+            }
+        }
         Console.WriteLine(CalibrateHelp);
         try
         {
