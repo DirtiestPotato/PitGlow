@@ -53,8 +53,10 @@ public sealed class RgbNetBackend : IBackend
         if (_provider is not null && _exclusive == exclusive && _provider.IsInitialized) return _provider;
         Close();
         var provider = _providerFor(exclusive);
+        var console = Console.Out;
         try
         {
+            Console.SetOut(TextWriter.Null);   // the SDK wrapper prints debug lines
             if (!provider.Initialize(RGBDeviceType.All, throwExceptions: true))
                 throw new BackendException($"{DisplayName} did not start");
         }
@@ -62,6 +64,10 @@ public sealed class RgbNetBackend : IBackend
         {
             try { provider.Dispose(); } catch { /* ignore */ }
             throw;
+        }
+        finally
+        {
+            Console.SetOut(console);
         }
         _provider = provider;
         _exclusive = exclusive;
@@ -119,6 +125,7 @@ public sealed class RgbNetBackend : IBackend
 
     private IReadOnlyList<DeviceInfo> Describe(IReadOnlyList<IRGBDevice> devices)
     {
+        var locations = Locations(devices);
         var seen = new Dictionary<string, int>();
         var output = new List<DeviceInfo>();
         for (int position = 0; position < devices.Count; position++)
@@ -135,7 +142,7 @@ public sealed class RgbNetBackend : IBackend
                 Occurrence = occurrence,
                 Position = position,
                 Kind = KindOf(d.DeviceInfo.DeviceType),
-                Location = LocationOf(d, leds),
+                Location = locations[position],
                 LedCount = leds.Count,
                 Zones = [new LedZone("LEDs", 0, Enumerable.Range(0, leds.Count).ToArray())],
                 OriginalColors = [.. leds.Select(l => new Rgb(l.Color.GetR(), l.Color.GetG(), l.Color.GetB()))],
@@ -146,11 +153,24 @@ public sealed class RgbNetBackend : IBackend
         return output;
     }
 
-    private string LocationOf(IRGBDevice d, List<Led> leds)
+    /// <summary>
+    /// A stable location per device: route, hardware id, kind of LED, and which one of that
+    /// kind it is on the controller (fans on one Commander Core all start at "Fan1").
+    /// </summary>
+    private List<string> Locations(IReadOnlyList<IRGBDevice> devices)
     {
-        var id = d.DeviceInfo is CorsairRGBDeviceInfo c ? c.DeviceId : d.DeviceInfo.Model;
-        var first = leds.Count > 0 ? leds[0].Id.ToString() : "";
-        return $"{Id}:{id}:{first}";
+        var counts = new Dictionary<string, int>();
+        var output = new List<string>(devices.Count);
+        foreach (var d in devices)
+        {
+            var id = d.DeviceInfo is CorsairRGBDeviceInfo c ? c.DeviceId : d.DeviceInfo.Model;
+            var first = d.OrderBy(l => (int)l.Id).Select(l => l.Id.ToString()).FirstOrDefault() ?? "";
+            var key = $"{Id}:{id}:{first}";
+            int n = counts.GetValueOrDefault(key);
+            counts[key] = n + 1;
+            output.Add(n == 0 ? key : $"{key}#{n + 1}");
+        }
+        return output;
     }
 
     private static DeviceKind KindOf(RGBDeviceType t)
@@ -189,10 +209,10 @@ public sealed class RgbNetBackend : IBackend
     private IRGBDevice Find(DeviceInfo info)
     {
         var provider = _provider ?? throw new BackendException($"{DisplayName} is not connected");
-        var matches = provider.Devices.Where(d => d.DeviceInfo.DeviceName == info.Name).ToList();
-        var byLocation = provider.Devices.FirstOrDefault(d =>
-            LocationOf(d, d.OrderBy(l => (int)l.Id).ToList()) == info.Location);
-        var device = byLocation ?? (info.Occurrence < matches.Count ? matches[info.Occurrence] : null);
+        var devices = provider.Devices;
+        int at = Locations(devices).IndexOf(info.Location);
+        var matches = devices.Where(d => d.DeviceInfo.DeviceName == info.Name).ToList();
+        var device = at >= 0 ? devices[at] : (info.Occurrence < matches.Count ? matches[info.Occurrence] : null);
         if (device is null) throw new BackendException($"{info.Label} is no longer listed by {DisplayName}");
         return device;
     }
