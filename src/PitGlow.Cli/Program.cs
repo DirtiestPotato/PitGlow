@@ -58,6 +58,7 @@ public static class Program
                 "run" => Run(args),
                 "hue" => HueSetup.Run(args.Config, args.HostGiven ? args.Host : null),
                 "hue-bt" => HueBluetoothSetup.Run(args.Config),
+                "hue-bt-check" => HueBluetoothCheckCommand(args),
                 "telemetry" => TelemetryCheck.Run(
                     Path.Combine(Path.GetDirectoryName(Path.GetFullPath(args.Config)) ?? ".", "telemetry-check.txt"), args.Seconds ?? 60),
                 _ => Usage(),
@@ -83,6 +84,16 @@ public static class Program
         }
     }
 
+    private static int HueBluetoothCheckCommand(Args args)
+    {
+        Console.WriteLine("Checking Hue Bluetooth bulbs. Keep the Hue app on your phone closed. This takes up to a minute per bulb.\n");
+        var report = HueBluetoothCheck.Run(Console.WriteLine);
+        var path = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(args.Config)) ?? ".", "hue-bluetooth-check.txt");
+        File.WriteAllText(path, report);
+        Console.WriteLine($"\nSaved to {path}");
+        return 0;
+    }
+
     private static int Usage()
     {
         PrintUsage();
@@ -91,7 +102,7 @@ public static class Program
 
     private static void PrintUsage() => Console.WriteLine(
         $"Potato PitGlow {typeof(Program).Assembly.GetName().Version?.ToString(3)}\n" +
-        "usage: PitGlow [run|demo|devices|init|calibrate|telemetry|hue|hue-bt] [--config FILE] [--host H] [--port P]\n" +
+        "usage: PitGlow [run|demo|devices|init|calibrate|telemetry|hue|hue-bt|hue-bt-check] [--config FILE] [--host H] [--port P]\n" +
         "               [--game iracing|acevo|acrally|wreckfest2|beamng] [--seconds N] [--force]");
 
     public static Args ParseArgs(string[] argv)
@@ -103,7 +114,7 @@ public static class Program
             string Next() => i + 1 < argv.Length ? argv[++i] : throw new ArgumentException($"{arg} needs a value");
             switch (arg)
             {
-                case "run" or "demo" or "devices" or "init" or "calibrate" or "telemetry" or "hue" or "hue-bt": a.Command = arg; break;
+                case "run" or "demo" or "devices" or "init" or "calibrate" or "telemetry" or "hue" or "hue-bt" or "hue-bt-check": a.Command = arg; break;
                 case "--config": a.Config = Next(); break;
                 case "--host": a.Host = Next(); a.HostGiven = true; break;
                 case "--port": a.Port = int.Parse(Next(), CultureInfo.InvariantCulture); a.PortGiven = true; break;
