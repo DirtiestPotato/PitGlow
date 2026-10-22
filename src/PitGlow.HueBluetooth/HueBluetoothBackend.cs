@@ -195,13 +195,28 @@ internal sealed class HueBluetoothSession(DeviceInfo info) : IDeviceSession
             throw new BackendException("this bulb is no longer paired with Windows; run HueBluetooth.bat");
         _gatt = Ble.Wait(GattSession.FromDeviceIdAsync(_device.BluetoothDeviceId), HueBluetoothBackend.ConnectTimeout, "open Bluetooth");
         if (_gatt is { CanMaintainConnection: true }) _gatt.MaintainConnection = true;
-        var services = Ble.Wait(_device.GetGattServicesForUuidAsync(HueBleProtocol.LightService, BluetoothCacheMode.Uncached),
-                                HueBluetoothBackend.ConnectTimeout, "connect to the bulb");
-        _service = services.Status == GattCommunicationStatus.Success ? services.Services.FirstOrDefault() : null;
-        if (_service is null) throw new BackendException($"the bulb didn't answer over Bluetooth ({services.Status}); is it within range?");
-        var chars = Ble.Wait(_service.GetCharacteristicsForUuidAsync(HueBleProtocol.LightState, BluetoothCacheMode.Uncached),
-                             HueBluetoothBackend.ConnectTimeout, "find the light control");
-        _light = chars.Characteristics.FirstOrDefault() ?? throw new BackendException("this Hue model has no Bluetooth light control PitGlow knows");
+        // Windows saved the bulb's layout when it paired: use that first, so we don't need a
+        // live answer before the link is up (Windows connects when the first color goes out).
+        // Ask the bulb itself only if nothing was saved, giving the link a few tries to come up.
+        GattCommunicationStatus last = GattCommunicationStatus.Unreachable;
+        foreach (var (mode, pause) in new[] { (BluetoothCacheMode.Cached, 0), (BluetoothCacheMode.Uncached, 0),
+                                              (BluetoothCacheMode.Uncached, 3000), (BluetoothCacheMode.Uncached, 5000) })
+        {
+            if (pause > 0) Thread.Sleep(pause);
+            var services = Ble.Wait(_device.GetGattServicesForUuidAsync(HueBleProtocol.LightService, mode),
+                                    HueBluetoothBackend.ConnectTimeout, "connect to the bulb");
+            last = services.Status;
+            var service = services.Status == GattCommunicationStatus.Success ? services.Services.FirstOrDefault() : null;
+            if (service is null) continue;
+            var chars = Ble.Wait(service.GetCharacteristicsForUuidAsync(HueBleProtocol.LightState, mode),
+                                 HueBluetoothBackend.ConnectTimeout, "find the light control");
+            var light = chars.Status == GattCommunicationStatus.Success ? chars.Characteristics.FirstOrDefault() : null;
+            if (light is null) { last = chars.Status; service.Dispose(); continue; }
+            _service = service;
+            _light = light;
+            return;
+        }
+        throw new BackendException($"the bulb didn't answer over Bluetooth ({last}). Is it switched on and in range, and is your phone's Hue app closed?");
     }
 
     public VerifyResult Verify(bool engaged) =>
@@ -210,7 +225,15 @@ internal sealed class HueBluetoothSession(DeviceInfo info) : IDeviceSession
     public void Acquire()
     {
         // Remember exactly how the bulb looks, to put it back afterwards.
-        _restore = HueBluetoothBackend.ReadState(_service!, BluetoothCacheMode.Uncached, TimeSpan.FromSeconds(5))?.Restore;
+        try
+        {
+            _restore = HueBluetoothBackend.ReadState(_service!, BluetoothCacheMode.Uncached, TimeSpan.FromSeconds(8))?.Restore;
+        }
+        catch (BackendException ex)
+        {
+            _restore = null;   // carry on; the bulb just won't be put back exactly afterwards
+            Log.Warn($"{info.Label}: couldn't read its current state ({ex.Message})");
+        }
         _last = null;
     }
 
@@ -239,8 +262,15 @@ internal sealed class HueBluetoothSession(DeviceInfo info) : IDeviceSession
     {
         using var writer = new DataWriter();
         writer.WriteBytes(payload);
-        var result = Ble.Wait(_light!.WriteValueWithResultAsync(writer.DetachBuffer(), GattWriteOption.WriteWithResponse),
-                              TimeSpan.FromSeconds(3), "send a color");
+        var buffer = writer.DetachBuffer();
+        var result = Ble.Wait(_light!.WriteValueWithResultAsync(buffer, GattWriteOption.WriteWithResponse),
+                              TimeSpan.FromSeconds(5), "send a color");
+        if (result.Status == GattCommunicationStatus.Unreachable)   // link still coming up: once more
+        {
+            Thread.Sleep(1000);
+            result = Ble.Wait(_light.WriteValueWithResultAsync(buffer, GattWriteOption.WriteWithResponse),
+                              TimeSpan.FromSeconds(5), "send a color");
+        }
         if (result.Status != GattCommunicationStatus.Success)
             throw new BackendException(result.Status == GattCommunicationStatus.ProtocolError && result.ProtocolError == 0x05
                 ? "the bulb refused the command: pair it with Windows again (HueBluetooth.bat)"
