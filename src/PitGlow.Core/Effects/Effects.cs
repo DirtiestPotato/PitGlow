@@ -16,6 +16,10 @@ public sealed record TachStyle
     public double BlinkHz { get; init; } = 8.0;
     public double Brightness { get; init; } = 1.0;
     public bool Smooth { get; init; } = true;
+    /// <summary>true: fill from idle to the shift point like a tach; false: only across the car's shift lights.</summary>
+    public bool FullRange { get; init; } = true;
+    /// <summary>Full range without a known idle RPM: start at this share of the shift point.</summary>
+    public double FullRangeStartPct { get; init; } = 0.30;
     public double StartPct { get; init; } = 0.60;   // of max RPM, used when the game gives no shift lights
     public double ShiftPct { get; init; } = 0.93;
     public double BlinkPct { get; init; } = 0.98;
@@ -25,7 +29,8 @@ public sealed record TachStyle
 
     public bool SameAs(TachStyle o) =>
         Gradient.SequenceEqual(o.Gradient) && ShiftColor == o.ShiftColor && BlinkHz == o.BlinkHz &&
-        Brightness == o.Brightness && Smooth == o.Smooth && StartPct == o.StartPct &&
+        Brightness == o.Brightness && Smooth == o.Smooth && FullRange == o.FullRange &&
+        FullRangeStartPct == o.FullRangeStartPct && StartPct == o.StartPct &&
         ShiftPct == o.ShiftPct && BlinkPct == o.BlinkPct && PitLimiter == o.PitLimiter &&
         LimiterColor == o.LimiterColor && LimiterHz == o.LimiterHz;
 }
@@ -114,8 +119,10 @@ public static class Effects
     {
         double top = Truthy(s.MaxRpm) ?? Truthy(learnedMax) ?? 8000.0;
         double shift = Truthy(s.ShiftRpm) ?? top * style.ShiftPct;
-        double first = Truthy(s.FirstRpm) ?? top * style.StartPct;
-        if (first >= shift) first = shift * 0.6;
+        double first = style.FullRange
+            ? Truthy(s.IdleRpm) ?? shift * style.FullRangeStartPct
+            : Truthy(s.FirstRpm) ?? top * style.StartPct;
+        if (first >= shift) first = shift * (style.FullRange ? style.FullRangeStartPct : 0.6);
         double blink = Truthy(s.BlinkRpm) ?? (top * style.BlinkPct > shift ? top * style.BlinkPct : shift);
         return (first, shift, Math.Max(blink, shift));
     }

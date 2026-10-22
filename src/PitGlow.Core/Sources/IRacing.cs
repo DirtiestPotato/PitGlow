@@ -50,7 +50,7 @@ public sealed partial class IRacingSource(IIRacingSdk? sdk = null) : ITelemetryS
     public static IReadOnlySet<Flag> FlagsFromBits(uint bits) =>
         Bits.Where(b => (bits & b.Mask) != 0).Select(b => b.Flag).ToHashSet();
 
-    [GeneratedRegex(@"^\s*(DriverCarSLFirstRPM|DriverCarSLShiftRPM|DriverCarSLBlinkRPM|DriverCarRedLine):\s*([-0-9.]+)", RegexOptions.Multiline)]
+    [GeneratedRegex(@"^\s*(DriverCarIdleRPM|DriverCarSLFirstRPM|DriverCarSLShiftRPM|DriverCarSLBlinkRPM|DriverCarRedLine):\s*([-0-9.]+)", RegexOptions.Multiline)]
     private static partial Regex LightPattern();
 
     public static Dictionary<string, double?> ParseLights(string? yaml)
@@ -93,6 +93,7 @@ public sealed partial class IRacingSource(IIRacingSdk? sdk = null) : ITelemetryS
         return new Sample(Game)
         {
             Rpm = snap.Rpm,
+            IdleRpm = _lights.GetValueOrDefault("DriverCarIdleRPM"),
             FirstRpm = _lights.GetValueOrDefault("DriverCarSLFirstRPM"),
             ShiftRpm = _lights.GetValueOrDefault("DriverCarSLShiftRPM"),
             BlinkRpm = _lights.GetValueOrDefault("DriverCarSLBlinkRPM"),

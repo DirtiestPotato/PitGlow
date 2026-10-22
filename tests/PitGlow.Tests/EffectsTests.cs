@@ -8,7 +8,7 @@ public class TachTests
     };
 
     private static int Lit(Rgb[] colors) => colors.Count(c => c != Rgb.Off);
-    private readonly TachStyle _style = new() { Smooth = false };
+    private readonly TachStyle _style = new() { Smooth = false, FullRange = false };
 
     [Fact]
     public void FillsProgressivelyGreenToRed()
@@ -20,7 +20,7 @@ public class TachTests
         var full = Effects.TachColors(8, Car(7999), _style, 0);
         Assert.Equal(new Rgb(0, 255, 0), full[0]);
         Assert.Equal(Rgb.Off, full[7]);
-        var almost = Effects.TachColors(8, Car(7999.9), new TachStyle { Smooth = true }, 0);
+        var almost = Effects.TachColors(8, Car(7999.9), new TachStyle { Smooth = true, FullRange = false }, 0);
         Assert.Equal(0, almost[7].G);
         Assert.Equal(0, almost[7].B);
     }
@@ -55,7 +55,7 @@ public class TachTests
     [Fact]
     public void SmoothLeadingLed()
     {
-        var colors = Effects.TachColors(8, Car(4000 + 4000 * 2.5 / 8), new TachStyle { Smooth = true }, 0);
+        var colors = Effects.TachColors(8, Car(4000 + 4000 * 2.5 / 8), new TachStyle { Smooth = true, FullRange = false }, 0);
         Assert.Equal(3, Lit(colors));
         Assert.True(colors[2].Max < colors[1].Max);
     }
@@ -79,6 +79,29 @@ public class TachTests
         (_, shift, _) = Effects.GaugePoints(new Sample("t") { MaxRpm = 7000 }, new TachStyle(), null);
         Assert.Equal(7000 * 0.93, shift, 6);
         Assert.All(Effects.TachColors(8, new Sample("t") { Rpm = double.NaN }, _style, 0), c => Assert.Equal(Rgb.Off, c));
+    }
+
+    [Fact]
+    public void FullRangeFillsFromIdle()
+    {
+        var style = new TachStyle { Smooth = false };          // default: full range
+        Sample At(double rpm) => new("t") { Rpm = rpm, IdleRpm = 1000, FirstRpm = 6000, ShiftRpm = 8000, BlinkRpm = 8400, MaxRpm = 8500 };
+        Assert.Equal(0, Lit(Effects.TachColors(8, At(900), style, 0)));
+        Assert.Equal(4, Lit(Effects.TachColors(8, At(4500), style, 0)));    // halfway: half lit, below the shift lights
+        var nearShift = Effects.TachColors(8, At(7950), style, 0);
+        Assert.Equal(7, Lit(nearShift));
+        Assert.Equal(new Rgb(0, 255, 0), nearShift[0]);                      // still starts green
+        Assert.True(nearShift[6].R > 200);                                    // ends orange-red
+        // After an upshift the revs drop to ~70%: most of the gauge stays lit instead of going blank.
+        Assert.True(Lit(Effects.TachColors(8, At(5600), style, 0)) >= 4);
+    }
+
+    [Fact]
+    public void FullRangeWithoutIdleStartsAtAShareOfTheShiftPoint()
+    {
+        var (first, shift, _) = Effects.GaugePoints(new Sample("t") { ShiftRpm = 8000 }, new TachStyle(), null);
+        Assert.Equal(8000 * 0.30, first, 6);
+        Assert.Equal(8000, shift, 6);
     }
 
     [Fact]

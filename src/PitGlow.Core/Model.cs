@@ -45,7 +45,8 @@ public static class Flags
 public sealed record Sample(string Game)
 {
     public double Rpm { get; init; }
-    public double? FirstRpm { get; init; }   // gauge starts filling here
+    public double? IdleRpm { get; init; }    // engine idle, where a full-range gauge starts
+    public double? FirstRpm { get; init; }   // the car's first shift light
     public double? ShiftRpm { get; init; }   // gauge is full here
     public double? BlinkRpm { get; init; }   // gauge flashes from here
     public double? MaxRpm { get; init; }     // limiter / redline, used for fallbacks
