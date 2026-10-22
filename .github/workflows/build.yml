@@ -3,7 +3,6 @@ name: build
 on:
   push:
     branches: [main]
-    tags: ['v*']
   pull_request:
   workflow_dispatch:
 
@@ -47,15 +46,27 @@ jobs:
           name: PitGlow-win-x64
           path: publish/
 
-      - name: Zip
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Read version
+        id: version
         shell: pwsh
-        run: Compress-Archive -Path publish/* -DestinationPath "PitGlow-${{ github.ref_name }}-win-x64.zip"
+        run: |
+          [xml]$props = Get-Content Directory.Build.props
+          "version=$($props.Project.PropertyGroup.Version)" >> $env:GITHUB_OUTPUT
+
+      - name: Zip
+        if: github.event_name == 'push'
+        shell: pwsh
+        run: Compress-Archive -Path publish/* -DestinationPath "PitGlow-${{ steps.version.outputs.version }}-win-x64.zip"
 
       - name: Release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: github.event_name == 'push'
         uses: softprops/action-gh-release@v2
         with:
-          files: PitGlow-${{ github.ref_name }}-win-x64.zip
+          tag_name: v${{ steps.version.outputs.version }}
+          name: PitGlow ${{ steps.version.outputs.version }} (beta)
+          target_commitish: ${{ github.sha }}
+          files: PitGlow-${{ steps.version.outputs.version }}-win-x64.zip
           prerelease: true
-          generate_release_notes: true
+          body: |
+            Download **PitGlow-${{ steps.version.outputs.version }}-win-x64.zip**, unzip it anywhere, and see README.md inside.
+            Built and tested automatically from commit ${{ github.sha }}.
