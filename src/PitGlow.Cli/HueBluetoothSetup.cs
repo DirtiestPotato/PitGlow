@@ -47,18 +47,34 @@ public static class HueBluetoothSetup
         Console.WriteLine($"\nLooking for Hue bulbs for {ScanTime.TotalSeconds:0} seconds...");
         var known = paired.Select(b => b.Address).ToHashSet();
         var found = HueBluetoothBackend.Scan(ScanTime, f =>
-            Console.WriteLine($"  found {f.Name} ({(known.Contains(f.Address) ? "already paired" : "new")}, signal {f.Rssi} dBm)"));
+            Console.WriteLine($"  found {Tag(f)} ({(known.Contains(f.Address) ? "already paired" : "new")}, signal {f.Rssi} dBm)"));
+        int failed = 0;
         foreach (var bulb in found.Where(f => !known.Contains(f.Address)))
         {
-            Console.Write($"  pairing {bulb.Name}... ");
+            Console.Write($"  pairing {Tag(bulb)}... ");
+            string result;
             try
             {
-                Console.WriteLine(HueBluetoothBackend.Pair(bulb.Address));
+                result = HueBluetoothBackend.Pair(bulb.Address);
             }
             catch (BackendException ex)
             {
-                Console.WriteLine(ex.Message);
+                result = ex.Message;
             }
+            Console.WriteLine(result);
+            if (result != "paired") failed++;
+        }
+        if (failed > 0)
+        {
+            Console.WriteLine("""
+
+                Some bulbs wouldn't pair from here. Pair them in Windows instead (opening it now):
+                  Bluetooth & devices > Add device > Bluetooth > pick each "Hue ..." light.
+                If they don't show up there, switch them off for 5 seconds and on again first.
+                Then run HueBluetooth.bat again.
+                """);
+            try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("ms-settings:bluetooth") { UseShellExecute = true }); }
+            catch { /* not on Windows */ }
         }
         if (found.Count == 0)
             Console.WriteLine("  none heard. If a bulb won't show up, pair it in Windows Settings > Bluetooth & devices > Add device > Bluetooth\n" +
@@ -86,4 +102,7 @@ public static class HueBluetoothSetup
         Console.WriteLine("Next: Demo.bat to see every flag on them, then PitGlow.bat and race.");
         return 0;
     }
+
+    /// <summary>Name plus the end of the Bluetooth address, so two "Hue light"s can be told apart.</summary>
+    private static string Tag(HueBluetoothBackend.Found f) => $"{f.Name} [..{f.Address & 0xFFFFFF:X6}]";
 }

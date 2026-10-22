@@ -162,15 +162,19 @@ public sealed class HueBluetoothBackend : IBackend
         var pairing = device.DeviceInformation.Pairing;
         if (pairing.IsPaired) return "already paired";
         if (!pairing.CanPair) return "the bulb isn't accepting pairing right now (switch it off and on, then try again within a few minutes)";
+        // Hue bulbs use "just works" pairing. Accept whatever Windows asks, at the default
+        // protection level; if that is refused, let Windows do its own standard pairing.
         pairing.Custom.PairingRequested += (_, e) => e.Accept();
-        var result = Ble.Wait(pairing.Custom.PairAsync(DevicePairingKinds.ConfirmOnly, DevicePairingProtectionLevel.Encryption),
-                              TimeSpan.FromSeconds(30), "pair with the bulb");
-        return result.Status switch
-        {
-            DevicePairingResultStatus.Paired or DevicePairingResultStatus.AlreadyPaired => "paired",
-            var s => $"pairing failed ({s})",
-        };
+        const DevicePairingKinds kinds = DevicePairingKinds.ConfirmOnly | DevicePairingKinds.ConfirmPinMatch | DevicePairingKinds.DisplayPin;
+        var status = Ble.Wait(pairing.Custom.PairAsync(kinds, DevicePairingProtectionLevel.Default),
+                              TimeSpan.FromSeconds(30), "pair with the bulb").Status;
+        if (!Ok(status))
+            status = Ble.Wait(pairing.PairAsync(DevicePairingProtectionLevel.Default), TimeSpan.FromSeconds(30), "pair with the bulb").Status;
+        return Ok(status) ? "paired" : $"pairing failed ({status})";
     }
+
+    private static bool Ok(DevicePairingResultStatus s) =>
+        s is DevicePairingResultStatus.Paired or DevicePairingResultStatus.AlreadyPaired;
 }
 
 internal sealed class HueBluetoothSession(DeviceInfo info) : IDeviceSession
