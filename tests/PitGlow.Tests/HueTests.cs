@@ -221,7 +221,7 @@ public class HueBluetoothTests
         Assert.Equal(new byte[] { 1, 1, 0 }, HueBleProtocol.Frame(Rgb.Off));
         var dim = HueBleProtocol.Frame(new Rgb(128, 0, 0));
         Assert.Equal(red[8..], dim[8..]);                 // same hue...
-        Assert.Equal(128, dim[5]);                        // ...half brightness
+        Assert.Equal(127, dim[5]);                        // ...half brightness (128/255 of 254)
     }
 
     [Fact]
