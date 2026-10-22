@@ -4,7 +4,8 @@ using PitGlow.Devices;
 namespace PitGlow.Rendering;
 
 /// <summary>A set of LEDs with one role (a fan ring, a pump, a whole GPU).</summary>
-public sealed record Group(string Role, IReadOnlyList<int> Leds, int StartLed = 0, bool Reverse = false, string Label = "");
+public sealed record Group(string Role, IReadOnlyList<int> Leds, int StartLed = 0, bool Reverse = false, string Label = "",
+                           bool ShiftAlert = false);
 
 public sealed record Layout(DeviceCfg Cfg, DeviceInfo Info, IReadOnlyList<Group> Groups);
 
@@ -69,7 +70,7 @@ public static class Layouts
             if (dev.Role is not null)
             {
                 if (dev.Role != Roles.Ignore)
-                    groups.Add(new Group(dev.Role, Enumerable.Range(0, info.LedCount).ToArray(), Label: info.Label));
+                    groups.Add(new Group(dev.Role, Enumerable.Range(0, info.LedCount).ToArray(), Label: info.Label, ShiftAlert: dev.ShiftAlert));
             }
             else
             {
@@ -105,7 +106,7 @@ public static class Layouts
                         problems.Add($"{info.Label}: zone \"{zone.Name}\" has 0 LEDs (set its size in OpenRGB)");
                         continue;
                     }
-                    groups.Add(new Group(z.Role, zone.Leds, z.StartLed, z.Reverse, $"{info.Label} / {zone.Name}"));
+                    groups.Add(new Group(z.Role, zone.Leds, z.StartLed, z.Reverse, $"{info.Label} / {zone.Name}", dev.ShiftAlert));
                 }
             }
             if (groups.Count > 0) layouts.Add(new Layout(dev, info, groups));

@@ -175,6 +175,39 @@ public class RenderTests
     }
 
     [Fact]
+    public void ShiftAlertFlashesWhiteOnFlagDevicesThatWantIt()
+    {
+        var gpu = _cfg.Devices.Single(d => d.Name.StartsWith("MSI"));
+        var ram = _cfg.Devices.Single(d => d.Name.StartsWith("Kingston"));
+        Assert.True(ram.ShiftAlert);       // suggested for RAM and pumps
+        Assert.False(gpu.ShiftAlert);
+        var plan = Layouts.Build(_cfg, _infos);
+        var r = new Renderer(_cfg);
+        var shifting = new Sample("t") { Rpm = 8100, IdleRpm = 1000, ShiftRpm = 8000, MaxRpm = 8500, Flags = new HashSet<Flag> { Flag.Blue } };
+        r.Update(shifting, 0);
+        var ramLayout = plan.Layouts.Single(l => l.Info.Name.StartsWith("Kingston"));
+        var gpuLayout = plan.Layouts.Single(l => l.Info.Name.StartsWith("MSI"));
+        Assert.All(r.Frame(ramLayout, shifting, 0.01), c => Assert.Equal(new Rgb(255, 255, 255), c));   // white, on
+        Assert.All(r.Frame(ramLayout, shifting, 0.07), c => Assert.Equal(Rgb.Off, c));                 // 8 Hz flash, off
+        Assert.True(r.Frame(gpuLayout, shifting, 0.01)[0].B > 0);                                        // GPU keeps the blue flag
+        var cruising = shifting with { Rpm = 5000 };
+        r.Update(cruising, 0.1);
+        Assert.True(r.Frame(ramLayout, cruising, 0.1)[0].B > r.Frame(ramLayout, cruising, 0.1)[0].R);    // back to the flag
+        var pit = shifting with { PitLimiter = true };
+        Assert.True(r.Frame(ramLayout, pit, 0.01)[0].B > 0);                                             // no alert on the limiter
+    }
+
+    [Fact]
+    public void ShiftAlertSurvivesTheSettingsFile()
+    {
+        var loaded = SettingsFile.Parse(SettingsFile.ToToml(_cfg));
+        Assert.True(loaded.Devices.Single(d => d.Name.StartsWith("Kingston")).ShiftAlert);
+        Assert.Equal(8.0, loaded.ShiftAlertStyle.Hz);
+        var custom = SettingsFile.Parse("[shift_alert]\ncolors = [\"#0000FF\"]\nhz = 4.0\n");
+        Assert.Equal(new Rgb(0, 0, 255), custom.ShiftAlertStyle.Colors[0]);
+    }
+
+    [Fact]
     public void LearnsMaxRpmWhenGameHasNone()
     {
         var r = new Renderer(_cfg);

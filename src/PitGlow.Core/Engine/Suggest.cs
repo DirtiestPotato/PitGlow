@@ -24,7 +24,9 @@ public static class Suggest
             }
             else if (info.Kind == DeviceKind.Dram)
             {
-                cfg.Devices.Add(Whole(info, 10));
+                var ram = Whole(info, 10);
+                ram.ShiftAlert = true;
+                cfg.Devices.Add(ram);
             }
             else if (info.Kind == DeviceKind.Cooler || (name.Contains("commander") && info.Kind != DeviceKind.Fan))
             {
@@ -43,8 +45,12 @@ public static class Suggest
                 double fps = name.Contains("commander") ? 20 : 30;
                 if (zones.Any(z => z.Role == Roles.Tach))
                     cfg.Devices.Add(new DeviceCfg { Name = info.Name, Backend = info.Backend, Index = info.Occurrence, MaxFps = fps, Location = Loc(info), Zones = zones });
-                else   // a cooler with no fan ports: treat the whole thing as a flag light
-                    cfg.Devices.Add(Whole(info, fps));
+                else   // a cooler with no fan ports (a pump): a flag light that also flashes at the shift point
+                {
+                    var pump = Whole(info, fps);
+                    pump.ShiftAlert = true;
+                    cfg.Devices.Add(pump);
+                }
             }
             else if (info.Kind == DeviceKind.Mouse)
             {

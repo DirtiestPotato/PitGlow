@@ -29,12 +29,15 @@ public sealed class DeviceCfg
     public int Index { get; set; }              // which one, when several devices share a name
     public string? Role { get; set; }           // whole-device role (GPU, RAM); else per zone
     public double MaxFps { get; set; } = 30.0;
+    /// <summary>Flag devices only: flash the shift alert while the car is at its shift point.</summary>
+    public bool ShiftAlert { get; set; }
     /// <summary>Hardware location reported by the backend; finds the device again after a rename.</summary>
     public string? Location { get; set; }
     public List<ZoneCfg> Zones { get; set; } = [];
 
     public bool SameAs(DeviceCfg o) =>
         Name == o.Name && Backend == o.Backend && Index == o.Index && Role == o.Role && MaxFps == o.MaxFps &&
+        ShiftAlert == o.ShiftAlert &&
         (Location ?? "") == (o.Location ?? "") && Zones.SequenceEqual(o.Zones);
 }
 
@@ -58,6 +61,8 @@ public sealed class Settings
     public double FlagBrightness { get; set; } = 1.0;
     public string WhenClear { get; set; } = "original";   // original | off | #RRGGBB
     public double LingerSeconds { get; set; } = 1.0;
+    /// <summary>How devices with shift_alert = true flash at the shift point.</summary>
+    public FlagStyle ShiftAlertStyle { get; set; } = new(FlagPattern.Flash, [new(255, 255, 255)], 8.0);
     public List<Flag> Priority { get; set; } = [.. Effects.DefaultPriority];
     public Dictionary<Flag, FlagStyle> FlagStyles { get; set; } = new(Effects.DefaultFlagStyles);
     public List<DeviceCfg> Devices { get; set; } = [];

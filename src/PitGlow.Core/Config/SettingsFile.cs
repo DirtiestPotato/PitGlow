@@ -76,6 +76,13 @@ public static class SettingsFile
             LimiterHz = Dbl(t, "limiter_hz", d.LimiterHz),
         };
 
+        var sa = Table(data, "shift_alert");
+        var sad = cfg.ShiftAlertStyle;
+        cfg.ShiftAlertStyle = new FlagStyle(
+            sa.TryGetValue("pattern", out var sap) ? FlagStyle.ParsePattern((string)sap) : sad.Pattern,
+            sa.TryGetValue("colors", out var sac) ? [.. ((TomlArray)sac).Select(x => Rgb.FromHex((string)x!))] : sad.Colors,
+            Dbl(sa, "hz", sad.Hz));
+
         var f = Table(data, "flags");
         cfg.FlagBrightness = Dbl(f, "brightness", 1.0);
         cfg.WhenClear = Str(f, "when_clear", "original");
@@ -126,6 +133,7 @@ public static class SettingsFile
                     Index = Int(dev, "index", 0),
                     Role = dev.ContainsKey("role") ? Roles.Check(Str(dev, "role", ""), where) : null,
                     MaxFps = Dbl(dev, "max_fps", 30),
+                    ShiftAlert = Bool(dev, "shift_alert", false),
                     Location = dev.ContainsKey("location") ? Str(dev, "location", "") : null,
                     Zones = zones,
                 });
@@ -241,6 +249,13 @@ public static class SettingsFile
             $"limiter_color = {S(t.LimiterColor.ToHex())}",
             $"limiter_hz = {N(t.LimiterHz)}",
             "",
+            "[shift_alert]",
+            "# Devices with shift_alert = true show this while the car is at its shift point,",
+            "# on top of whatever flag is out.",
+            $"pattern = {S(PatternName(cfg.ShiftAlertStyle.Pattern))}",
+            "colors = [" + string.Join(", ", cfg.ShiftAlertStyle.Colors.Select(c => S(c.ToHex()))) + "]",
+            $"hz = {N(cfg.ShiftAlertStyle.Hz)}",
+            "",
             "[flags]",
             $"brightness = {N(cfg.FlagBrightness)}",
             "# What flag devices show when no flag is out: original | off | #RRGGBB",
@@ -272,6 +287,7 @@ public static class SettingsFile
             "# start_led / reverse: where the gauge starts on each fan and which way it sweeps.",
             "# location / index: how PitGlow finds the device and zone again if names change.",
             "# max_fps: cap on updates per second for that device.",
+            "# shift_alert = true: a flag device also flashes the shift alert at the shift point.",
             "# ---------------------------------------------------------------------------",
         ]);
         foreach (var dev in cfg.Devices)
@@ -280,6 +296,7 @@ public static class SettingsFile
             if (!string.IsNullOrEmpty(dev.Location)) lines.Add($"location = {S(dev.Location)}");
             if (dev.Role is not null) lines.Add($"role = {S(dev.Role)}");
             lines.Add($"max_fps = {N(dev.MaxFps)}");
+            if (dev.ShiftAlert) lines.Add("shift_alert = true");
             foreach (var z in dev.Zones)
             {
                 lines.AddRange(["", "  [[device.zone]]", $"  zone = {S(z.Zone)}"]);

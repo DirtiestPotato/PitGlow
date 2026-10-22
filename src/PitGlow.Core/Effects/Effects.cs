@@ -127,6 +127,14 @@ public static class Effects
         return (first, shift, Math.Max(blink, shift));
     }
 
+    /// <summary>True while the car is at or past its shift point (and not on the pit limiter).</summary>
+    public static bool ShiftActive(Sample s, TachStyle style, double? learnedMax)
+    {
+        if (s.PitLimiter && style.PitLimiter) return false;
+        double rpm = double.IsFinite(s.Rpm) ? s.Rpm : 0.0;
+        return s.ShiftNow || rpm >= GaugePoints(s, style, learnedMax).Shift;
+    }
+
     /// <summary>Colors for one ring or strip of n LEDs, in the device's LED order.</summary>
     public static Rgb[] TachColors(int n, Sample s, TachStyle style, double now,
                                    int startLed = 0, bool reverse = false, double? learnedMax = null)

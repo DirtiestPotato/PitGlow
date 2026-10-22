@@ -28,12 +28,15 @@ public sealed class Renderer(Settings cfg)
     public Rgb[] Frame(Layout layout, Sample sample, double now)
     {
         var output = layout.Info.OriginalColors.ToArray();   // unassigned LEDs keep their original color
+        bool shifting = layout.Groups.Any(g => g.ShiftAlert) && Effects.ShiftActive(sample, cfg.Tach, LearnedMax);
         foreach (var g in layout.Groups)
         {
             int n = g.Leds.Count;
             Rgb[] colors;
             if (g.Role == Roles.Tach)
                 colors = Effects.TachColors(n, sample, cfg.Tach, now, g.StartLed, g.Reverse, LearnedMax);
+            else if (shifting && g.ShiftAlert)
+                colors = Effects.FlagColors(cfg.ShiftAlertStyle, n, now, cfg.FlagBrightness);
             else if (Flag is PitGlow.Flag flag && cfg.FlagStyles.TryGetValue(flag, out var style))
                 colors = Effects.FlagColors(style, n, now, cfg.FlagBrightness);
             else
