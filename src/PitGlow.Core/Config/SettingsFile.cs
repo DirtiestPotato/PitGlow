@@ -31,6 +31,7 @@ public static class SettingsFile
         cfg.OpenRgbEnabled = Bool(rgb, "enabled", true);
         cfg.ICueEnabled = Bool(Table(data, "icue"), "enabled", true);
         cfg.RazerEnabled = Bool(Table(data, "razer"), "enabled", true);
+        cfg.HueBluetoothEnabled = Bool(Table(data, "hue_bluetooth"), "enabled", true);
         var hue = Table(data, "hue");
         cfg.Hue = new HueCfg
         {
@@ -230,6 +231,10 @@ public static class SettingsFile
             "[razer]",
             "# Razer devices through Razer Synapse (Chroma).",
             $"enabled = {B(cfg.RazerEnabled)}",
+            "",
+            "[hue_bluetooth]",
+            "# Philips Hue Bluetooth bulbs paired with this PC (no bridge). Run HueBluetooth.bat to pair.",
+            $"enabled = {B(cfg.HueBluetoothEnabled)}",
             "",
             "[hue]",
             "# Philips Hue lights through the Hue Bridge (Entertainment areas). Run HueSetup.bat to pair.",

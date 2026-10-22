@@ -67,6 +67,7 @@ public sealed class Settings
     public bool ICueEnabled { get; set; } = true;
     public bool RazerEnabled { get; set; } = true;
     public HueCfg Hue { get; set; } = new();
+    public bool HueBluetoothEnabled { get; set; } = true;
     public GameCfg Game { get; set; } = new();
     public TachStyle Tach { get; set; } = new();
     public double FlagBrightness { get; set; } = 1.0;

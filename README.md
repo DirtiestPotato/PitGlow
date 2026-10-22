@@ -39,7 +39,19 @@ Options → Other → Protocols → turn on **OutGauge UDP**, IP `127.0.0.1`, po
 
 ## Philips Hue
 
-Hue lights show the race flags (and the rev color in games without flags) through your Hue Bridge, the same fast "Entertainment" streaming Hue Sync uses.
+Hue lights show the race flags (and the rev color in games without flags), with or without a Hue Bridge.
+
+### Without a bridge (Bluetooth)
+
+Your PC needs Bluetooth and should be within a room or so of the bulbs. Bluetooth takes about 10 color changes a second per bulb: flags look right, very fast flashing lags a little.
+
+1. Make the bulbs discoverable: in the Hue Bluetooth app, **Settings > Voice assistants > Make discoverable**, or switch each bulb off for 5 seconds and on again. Close the Hue app on your phone (a bulb talks to one device at a time).
+2. Run **HueBluetooth.bat**. It finds the bulbs, pairs them with Windows, and adds them to `pitglow.toml`.
+3. **Demo.bat** to see the flags, then **PitGlow.bat** and race. When PitGlow stops, each bulb goes back to how it was.
+
+### With a Hue Bridge
+
+Uses the same fast "Entertainment" streaming Hue Sync uses.
 
 1. In the Hue app: **Settings > Entertainment areas > Create**, and add the lights you want around your rig.
 2. Run **HueSetup.bat** and press the round button on top of the bridge when it asks. It pairs PitGlow and adds each Entertainment area to `pitglow.toml`.

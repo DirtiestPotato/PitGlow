@@ -56,6 +56,10 @@ public static class Suggest
             {
                 cfg.Devices.Add(Whole(info, 25));   // Hue Entertainment area: flags on every light
             }
+            else if (info.Kind == DeviceKind.Light && info.Backend == "huebt")
+            {
+                cfg.Devices.Add(Whole(info, 10));   // Hue Bluetooth bulb: ~10 changes a second
+            }
             else if (info.Kind == DeviceKind.Mouse)
             {
                 cfg.Devices.Add(Whole(info, 20));

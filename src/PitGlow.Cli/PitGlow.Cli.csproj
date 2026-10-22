@@ -1,7 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
     <UseWindowsForms>true</UseWindowsForms>
     <AssemblyName>PitGlow</AssemblyName>
     <RootNamespace>PitGlow.Cli</RootNamespace>
@@ -16,5 +17,6 @@
     <ProjectReference Include="..\PitGlow.OpenRgb\PitGlow.OpenRgb.csproj" />
     <ProjectReference Include="..\PitGlow.RgbNet\PitGlow.RgbNet.csproj" />
     <ProjectReference Include="..\PitGlow.Hue\PitGlow.Hue.csproj" />
+    <ProjectReference Include="..\PitGlow.HueBluetooth\PitGlow.HueBluetooth.csproj" />
   </ItemGroup>
 </Project>

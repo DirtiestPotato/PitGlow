@@ -206,3 +206,61 @@ public class HueTests
         Assert.False(SettingsFile.Parse("").Hue.Paired);
     }
 }
+
+public class HueBluetoothTests
+{
+    [Fact]
+    public void FrameSetsPowerBrightnessAndColor()
+    {
+        var red = HueBleProtocol.Frame(new Rgb(255, 0, 0));
+        Assert.Equal(new byte[] { 1, 1, 1, 2, 1, 254 }, red[..6]);
+        Assert.Equal(new byte[] { 4, 4 }, red[6..8]);
+        int x = red[8] | red[9] << 8, y = red[10] | red[11] << 8;
+        Assert.InRange(x / 65535.0, 0.68, 0.72);       // Philips' red corner
+        Assert.InRange(y / 65535.0, 0.28, 0.31);
+        Assert.Equal(new byte[] { 1, 1, 0 }, HueBleProtocol.Frame(Rgb.Off));
+        var dim = HueBleProtocol.Frame(new Rgb(128, 0, 0));
+        Assert.Equal(red[8..], dim[8..]);                 // same hue...
+        Assert.Equal(128, dim[5]);                        // ...half brightness
+    }
+
+    [Fact]
+    public void ParseKeepsWhatToRestoreAndDropsEffects()
+    {
+        // On, brightness 200, color temp 370 mirek, then an effect entry.
+        byte[] read = [1, 1, 1, 2, 1, 200, 3, 2, 0x72, 0x01, 6, 1, 0x02];
+        var s = HueBleProtocol.Parse(read);
+        Assert.Equal(new byte[] { 1, 1, 1, 2, 1, 200, 3, 2, 0x72, 0x01 }, s.Restore);
+        Assert.True(s.Look.R > s.Look.G && s.Look.G > s.Look.B);   // warm white
+        var off = HueBleProtocol.Parse([1, 1, 0, 2, 1, 254]);
+        Assert.Equal(Rgb.Off, off.Look);
+        var xy = HueBleProtocol.Frame(new Rgb(0, 0, 255));
+        var blue = HueBleProtocol.Parse(xy).Look;
+        Assert.True(blue.B > 200 && blue.R < 80 && blue.G < 80, blue.ToString());
+        Assert.Empty(HueBleProtocol.Parse([2, 9, 1]).Restore);    // truncated: ignored
+    }
+
+    [Fact]
+    public void RecognisesHueNames()
+    {
+        Assert.True(HueBleProtocol.LooksLikeHue("Hue color lamp"));
+        Assert.True(HueBleProtocol.LooksLikeHue("Hue lightstrip plus"));
+        Assert.False(HueBleProtocol.LooksLikeHue("Bluetooth Headphones"));
+        Assert.False(HueBleProtocol.LooksLikeHue("Huey's speaker"));
+        Assert.True(HueBleProtocol.LooksLikeHue("Desk", advertisesSignifyService: true));
+    }
+
+    [Fact]
+    public void BulbsBecomeFlagLights()
+    {
+        var info = new DeviceInfo
+        {
+            Backend = "huebt", Name = "Hue color lamp", Kind = DeviceKind.Light, Location = "huebt:001788AABBCC", LedCount = 1,
+            Zones = [new LedZone("Light", 0, [0])], OriginalColors = [new Rgb(255, 180, 110)], BackendState = 0x001788AABBCCUL,
+        };
+        var dev = Suggest.Config([info]).Devices.Single();
+        Assert.Equal(("huebt", Roles.Flags, 10.0), (dev.Backend, dev.Role, dev.MaxFps));
+        Assert.True(SettingsFile.Parse(SettingsFile.ToToml(new Settings())).HueBluetoothEnabled);
+        Assert.False(SettingsFile.Parse("[hue_bluetooth]\nenabled = false\n").HueBluetoothEnabled);
+    }
+}
