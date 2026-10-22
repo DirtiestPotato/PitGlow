@@ -6,6 +6,7 @@ using PitGlow.Config;
 using PitGlow.Devices;
 using PitGlow.Engine;
 using PitGlow.OpenRgb;
+using PitGlow.RgbNet;
 using PitGlow.Rendering;
 using PitGlow.Sources;
 
@@ -109,23 +110,44 @@ public static class Program
         return a;
     }
 
-    /// <summary>The backend this session talks to. Swapped for a fake in tests.</summary>
-    public static Func<string, int, IBackend> BackendFactory { get; set; } = (h, p) => new OpenRgbBackend(h, p);
+    /// <summary>Tests switch the vendor SDK routes off; they need real hardware.</summary>
+    public static bool IncludeVendorBackends { get; set; } = OperatingSystem.IsWindows();
 
-    private static IBackend Backend(Args args, Settings? cfg) =>
-        BackendFactory(args.HostGiven || cfg is null ? args.Host : cfg.Host,
-                       args.PortGiven || cfg is null ? args.Port : cfg.Port);
+    /// <summary>Every lighting route this session uses, vendor SDKs first.</summary>
+    private static BackendSet Backends(Args args, Settings? cfg)
+    {
+        var list = new List<IBackend>();
+        if (IncludeVendorBackends)
+        {
+            if (cfg?.ICueEnabled != false) list.Add(RgbNetBackend.Corsair());
+            if (cfg?.RazerEnabled != false) list.Add(RgbNetBackend.Razer());
+        }
+        if (cfg?.OpenRgbEnabled != false)
+            list.Add(new OpenRgbBackend(args.HostGiven || cfg is null ? args.Host : cfg.Host,
+                                        args.PortGiven || cfg is null ? args.Port : cfg.Port));
+        return new BackendSet(list);
+    }
+
+    private static BackendSet.Result DiscoverAll(BackendSet set, bool quiet = false)
+    {
+        var result = set.Discover(DiscoverTimeout);
+        if (!quiet) foreach (var note in result.Notes) Console.WriteLine($"  - {note}");
+        if (result.Devices.Count == 0)
+            throw new BackendException(
+                "No lighting devices found. Start iCUE (for Corsair), Synapse (for Razer) or OpenRGB with its SDK Server on, then try again.");
+        return result;
+    }
 
     // ---------------------------------------------------------------------------------
 
     private static int Devices(Args args)
     {
         Settings? cfg = File.Exists(args.Config) ? SettingsFile.Load(args.Config) : null;
-        var infos = Backend(args, cfg).Discover(DiscoverTimeout);
-        if (infos.Count == 0) Console.WriteLine("OpenRGB reports no devices.");
+        Console.WriteLine("Lighting routes:");
+        var infos = DiscoverAll(Backends(args, cfg)).Devices;
         foreach (var info in infos)
         {
-            Console.WriteLine($"\n{info.Label}   [{info.KindName}]   {info.LedCount} LEDs");
+            Console.WriteLine($"\n{info.Label}   [{info.KindName}]   {info.LedCount} LEDs   via {info.Backend}");
             Console.WriteLine($"    modes: {(info.ModeNames.Count > 0 ? string.Join(", ", info.ModeNames) : "-")}");
             if (info.Location.Length > 0) Console.WriteLine($"    location: {info.Location}");
             foreach (var zone in info.Zones) Console.WriteLine($"    zone '{zone.Name}': {zone.Leds.Count} LEDs");
@@ -140,7 +162,8 @@ public static class Program
             Console.WriteLine($"{args.Config} already exists. Use --force to replace it.");
             return 1;
         }
-        var infos = Backend(args, null).Discover(DiscoverTimeout);
+        Console.WriteLine("Lighting routes:");
+        var infos = DiscoverAll(Backends(args, null)).Devices;
         var cfg = Suggest.Config(infos);
         cfg.Host = args.Host;
         cfg.Port = args.Port;
@@ -174,20 +197,21 @@ public static class Program
     }
 
     /// <summary>Discover, recover from a crashed session if needed, and build the plan.</summary>
-    private static (IBackend Backend, IReadOnlyList<DeviceInfo> Infos, LayoutPlan Plan, RestoreJournal Journal)
+    private static (BackendSet Backends, IReadOnlyList<DeviceInfo> Infos, LayoutPlan Plan, RestoreJournal Journal)
         Prepare(Args args, Settings cfg)
     {
-        var backend = Backend(args, cfg);
+        var set = Backends(args, cfg);
         var journal = new RestoreJournal(RestoreJournal.DefaultPath());
-        var infos = backend.Discover(DiscoverTimeout);
-        if (journal.Entries().Any(e => e.Backend == backend.Id))
+        Console.WriteLine("Lighting routes:");
+        var infos = DiscoverAll(set).Devices;
+        int restored = 0;
+        foreach (var backend in set.Backends)
+            if (journal.Entries().Any(e => e.Backend == backend.Id))
+                restored += journal.Recover(backend, infos.Where(i => i.Backend == backend.Id).ToList());
+        if (restored > 0)
         {
-            int restored = journal.Recover(backend, infos);
-            if (restored > 0)
-            {
-                Console.WriteLine($"Put back the lighting on {restored} device(s) left over from a session that didn't close cleanly.");
-                infos = backend.Discover(DiscoverTimeout);
-            }
+            Console.WriteLine($"Put back the lighting on {restored} device(s) left over from a session that didn't close cleanly.");
+            infos = DiscoverAll(set, quiet: true).Devices;
         }
         Console.WriteLine("Lighting plan:");
         var plan = PrintPlan(cfg, infos);
@@ -196,14 +220,14 @@ public static class Program
             SettingsFile.Save(cfg, args.Config);
             Log.Info("Updated device names / locations in settings");
         }
-        return (backend, infos, plan, journal);
+        return (set, infos, plan, journal);
     }
 
     private static int RunLoop(Args args, Settings cfg, ITelemetrySource source, double? seconds, bool quiet = false)
     {
         var (backend, _, plan, journal) = Prepare(args, cfg);
         if (plan.Layouts.Count == 0) return 1;
-        var runner = new Runner(cfg, source, backend, plan.Layouts, journal);
+        var runner = new Runner(cfg, source, backend.OpenSession, plan.Layouts, journal);
         using var stop = new CancellationTokenSource();
         using var finished = new ManualResetEventSlim();
         Console.CancelKeyPress += (_, e) =>

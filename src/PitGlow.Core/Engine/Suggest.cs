@@ -26,7 +26,7 @@ public static class Suggest
             {
                 cfg.Devices.Add(Whole(info, 10));
             }
-            else if (info.Kind == DeviceKind.Cooler || name.Contains("commander"))
+            else if (info.Kind == DeviceKind.Cooler || (name.Contains("commander") && info.Kind != DeviceKind.Fan))
             {
                 var zones = new List<ZoneCfg>();
                 foreach (var zone in info.Zones)
@@ -42,13 +42,22 @@ public static class Suggest
                 }
                 double fps = name.Contains("commander") ? 20 : 30;
                 if (zones.Any(z => z.Role == Roles.Tach))
-                    cfg.Devices.Add(new DeviceCfg { Name = info.Name, Index = info.Occurrence, MaxFps = fps, Location = Loc(info), Zones = zones });
+                    cfg.Devices.Add(new DeviceCfg { Name = info.Name, Backend = info.Backend, Index = info.Occurrence, MaxFps = fps, Location = Loc(info), Zones = zones });
                 else   // a cooler with no fan ports: treat the whole thing as a flag light
                     cfg.Devices.Add(Whole(info, fps));
             }
             else if (info.Kind == DeviceKind.Mouse)
             {
                 cfg.Devices.Add(Whole(info, 20));
+            }
+            else if (info.Kind == DeviceKind.Fan || (info.Kind == DeviceKind.LedStrip && info.Backend != "openrgb"))
+            {
+                // Vendor SDKs report each fan (or strip) as its own device with one zone.
+                cfg.Devices.Add(new DeviceCfg
+                {
+                    Name = info.Name, Backend = info.Backend, Index = info.Occurrence, MaxFps = 30, Location = Loc(info),
+                    Zones = [.. info.Zones.Select(z => new ZoneCfg { Zone = z.Name, Role = Roles.Tach, Index = z.Index })],
+                });
             }
         }
         return cfg;
@@ -57,5 +66,5 @@ public static class Suggest
     private static string? Loc(DeviceInfo info) => string.IsNullOrEmpty(info.Location) ? null : info.Location;
 
     private static DeviceCfg Whole(DeviceInfo info, double fps) =>
-        new() { Name = info.Name, Index = info.Occurrence, Role = Roles.Flags, MaxFps = fps, Location = Loc(info) };
+        new() { Name = info.Name, Backend = info.Backend, Index = info.Occurrence, Role = Roles.Flags, MaxFps = fps, Location = Loc(info) };
 }

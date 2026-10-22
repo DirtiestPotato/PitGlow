@@ -4,7 +4,7 @@
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <Version>0.2.0</Version>
+    <Version>0.3.0</Version>
     <Authors>Dirtiest Potato Entertainment</Authors>
     <Product>Potato PitGlow</Product>
     <Copyright>Copyright (C) 2026 Dirtiest Potato Entertainment. GPL-3.0-or-later.</Copyright>

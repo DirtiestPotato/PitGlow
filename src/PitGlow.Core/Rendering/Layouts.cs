@@ -29,24 +29,25 @@ public static class Layouts
 
         foreach (var dev in cfg.Devices)
         {
-            var info = infos.FirstOrDefault(i => i.Name == dev.Name && i.Occurrence == dev.Index && !taken.Contains(i));
+            var pool = infos.Where(i => i.Backend == dev.Backend).ToList();
+            var info = pool.FirstOrDefault(i => i.Name == dev.Name && i.Occurrence == dev.Index && !taken.Contains(i));
             if (info is null && !string.IsNullOrEmpty(dev.Location))
-                info = infos.FirstOrDefault(i => i.Location == dev.Location && !taken.Contains(i));
+                info = pool.FirstOrDefault(i => i.Location == dev.Location && !taken.Contains(i));
             if (info is null && Fingerprint.UsbId(dev.Location) is string usb)
-                info = infos.Where(i => i.UsbId == usb && !taken.Contains(i)).ElementAtOrDefault(0);
+                info = pool.Where(i => i.UsbId == usb && !taken.Contains(i)).ElementAtOrDefault(0);
             if (info is null && string.IsNullOrEmpty(dev.Location))
             {
                 // Older settings without a location: accept a single device whose name starts the
                 // same way ("Kingston Fury DDR5 RGB" -> "Kingston Fury DDR5 DRAM" in OpenRGB 1.x).
                 var stem = NameStem(dev.Name);
-                var similar = infos.Where(i => !taken.Contains(i) && NameStem(i.Name) == stem
+                var similar = pool.Where(i => !taken.Contains(i) && NameStem(i.Name) == stem
                                                && !cfg.Devices.Any(d => d.Name == i.Name)).ToList();
                 if (stem.Length > 0 && similar.Select(i => i.Name).Distinct().Count() == 1)
                     info = similar.FirstOrDefault(i => i.Occurrence == dev.Index);
             }
             if (info is null)
             {
-                problems.Add($"Device not found: \"{dev.Name}\" (index {dev.Index})");
+                problems.Add($"Device not found: \"{dev.Name}\" (index {dev.Index}, {dev.Backend})");
                 continue;
             }
             taken.Add(info);

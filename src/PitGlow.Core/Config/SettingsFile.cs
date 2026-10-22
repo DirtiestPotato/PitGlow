@@ -28,6 +28,9 @@ public static class SettingsFile
         var rgb = Table(data, "openrgb");
         cfg.Host = Str(rgb, "host", cfg.Host);
         cfg.Port = Int(rgb, "port", cfg.Port);
+        cfg.OpenRgbEnabled = Bool(rgb, "enabled", true);
+        cfg.ICueEnabled = Bool(Table(data, "icue"), "enabled", true);
+        cfg.RazerEnabled = Bool(Table(data, "razer"), "enabled", true);
 
         var game = Table(data, "game");
         cfg.Game = new GameCfg
@@ -112,6 +115,7 @@ public static class SettingsFile
                 cfg.Devices.Add(new DeviceCfg
                 {
                     Name = name,
+                    Backend = Str(dev, "backend", "openrgb"),
                     Index = Int(dev, "index", 0),
                     Role = dev.ContainsKey("role") ? Roles.Check(Str(dev, "role", ""), where) : null,
                     MaxFps = Dbl(dev, "max_fps", 30),
@@ -186,10 +190,20 @@ public static class SettingsFile
             "# Potato PitGlow settings. Edit, save, and restart PitGlow.",
             "# Colors are #RRGGBB. Brightness is 0.0 - 1.0. hz = flashes per second.",
             "",
+            "# Lighting routes. Each device is driven by exactly one of them.",
             "[openrgb]",
-            "# OpenRGB > SDK Server tab must be running.",
+            "# OpenRGB > SDK Server tab must be running. Optional: PitGlow carries on without it.",
+            $"enabled = {B(cfg.OpenRgbEnabled)}",
             $"host = {S(cfg.Host)}",
             $"port = {cfg.Port}",
+            "",
+            "[icue]",
+            "# Corsair devices through Corsair iCUE (iCUE must be installed and running).",
+            $"enabled = {B(cfg.ICueEnabled)}",
+            "",
+            "[razer]",
+            "# Razer devices through Razer Synapse (Chroma).",
+            $"enabled = {B(cfg.RazerEnabled)}",
             "",
             "[game]",
             "# auto | iracing | acevo | acrally | wreckfest2 | beamng | demo",
@@ -250,7 +264,7 @@ public static class SettingsFile
         ]);
         foreach (var dev in cfg.Devices)
         {
-            lines.AddRange(["", "[[device]]", $"name = {S(dev.Name)}", $"index = {dev.Index}"]);
+            lines.AddRange(["", "[[device]]", $"name = {S(dev.Name)}", $"backend = {S(dev.Backend)}", $"index = {dev.Index}"]);
             if (!string.IsNullOrEmpty(dev.Location)) lines.Add($"location = {S(dev.Location)}");
             if (dev.Role is not null) lines.Add($"role = {S(dev.Role)}");
             lines.Add($"max_fps = {N(dev.MaxFps)}");

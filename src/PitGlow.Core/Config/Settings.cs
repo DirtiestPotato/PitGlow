@@ -24,6 +24,8 @@ public sealed record ZoneCfg
 public sealed class DeviceCfg
 {
     public required string Name { get; set; }
+    /// <summary>Which lighting route drives this device: openrgb (default), icue, razer.</summary>
+    public string Backend { get; set; } = "openrgb";
     public int Index { get; set; }              // which one, when several devices share a name
     public string? Role { get; set; }           // whole-device role (GPU, RAM); else per zone
     public double MaxFps { get; set; } = 30.0;
@@ -32,7 +34,7 @@ public sealed class DeviceCfg
     public List<ZoneCfg> Zones { get; set; } = [];
 
     public bool SameAs(DeviceCfg o) =>
-        Name == o.Name && Index == o.Index && Role == o.Role && MaxFps == o.MaxFps &&
+        Name == o.Name && Backend == o.Backend && Index == o.Index && Role == o.Role && MaxFps == o.MaxFps &&
         (Location ?? "") == (o.Location ?? "") && Zones.SequenceEqual(o.Zones);
 }
 
@@ -48,6 +50,9 @@ public sealed class Settings
 {
     public string Host { get; set; } = "127.0.0.1";
     public int Port { get; set; } = 6742;
+    public bool OpenRgbEnabled { get; set; } = true;
+    public bool ICueEnabled { get; set; } = true;
+    public bool RazerEnabled { get; set; } = true;
     public GameCfg Game { get; set; } = new();
     public TachStyle Tach { get; set; } = new();
     public double FlagBrightness { get; set; } = 1.0;

@@ -32,6 +32,21 @@ jobs:
       - name: Publish PitGlow.exe
         run: dotnet publish src/PitGlow.Cli/PitGlow.Cli.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=none -o publish
 
+      - name: Bundle Corsair iCUE SDK
+        shell: pwsh
+        run: |
+          $rel = Invoke-RestMethod -Uri https://api.github.com/repos/CorsairOfficial/cue-sdk/releases/latest -Headers @{ Authorization = "Bearer ${{ github.token }}" }
+          $asset = $rel.assets | Where-Object { $_.name -like '*.zip' } | Select-Object -First 1
+          Write-Host "iCUE SDK $($rel.tag_name): $($asset.name)"
+          Invoke-WebRequest -Uri $asset.browser_download_url -OutFile cuesdk.zip
+          Expand-Archive cuesdk.zip -DestinationPath cuesdk
+          $dll = Get-ChildItem cuesdk -Recurse -Filter 'iCUESDK.x64_2019.dll' | Select-Object -First 1
+          if (-not $dll) { throw "iCUESDK.x64_2019.dll not found in $($asset.name)" }
+          New-Item -ItemType Directory -Force publish/x64 | Out-Null
+          Copy-Item $dll.FullName publish/x64/
+          $lic = Get-ChildItem cuesdk -Recurse -Include 'LICENSE*','*license*' | Select-Object -First 1
+          if ($lic) { Copy-Item $lic.FullName publish/x64/iCUESDK-LICENSE.txt }
+
       - name: Add launchers and docs
         shell: pwsh
         run: |

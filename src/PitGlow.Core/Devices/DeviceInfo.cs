@@ -7,6 +7,7 @@ public enum DeviceKind
 {
     Motherboard, Dram, Gpu, Cooler, LedStrip, Keyboard, Mouse, Mousemat, Headset, HeadsetStand,
     Gamepad, Light, Speaker, Virtual, Storage, Case, Microphone, Accessory, Keypad, Unknown,
+    Fan,   // not an OpenRGB type: vendor SDKs report each fan as its own device
 }
 
 /// <summary>A named group of LEDs inside a device (a fan, a RAM stick, a key row).</summary>

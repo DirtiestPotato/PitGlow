@@ -273,6 +273,7 @@ public sealed class EndToEndTests : IDisposable
         var dir = Directory.CreateTempSubdirectory("pitglow-cli");
         var config = Path.Combine(dir.FullName, "pitglow.toml");
         var port = _server.Port.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        PitGlow.Cli.Program.IncludeVendorBackends = false;   // no iCUE / Synapse on the build machine
         var output = new StringWriter();
         var stdout = Console.Out;
         Console.SetOut(output);

@@ -27,6 +27,10 @@ public sealed class Runner
     private double _heartbeat;
 
     public Runner(Settings cfg, ITelemetrySource source, IBackend backend, IReadOnlyList<Layout> layouts, RestoreJournal? journal)
+        : this(cfg, source, backend.OpenSession, layouts, journal) { }
+
+    public Runner(Settings cfg, ITelemetrySource source, Func<DeviceInfo, IDeviceSession> openSession,
+                  IReadOnlyList<Layout> layouts, RestoreJournal? journal)
     {
         _cfg = cfg;
         _source = source;
@@ -35,7 +39,7 @@ public sealed class Runner
         foreach (var layout in layouts)
         {
             var info = layout.Info;
-            _workers[layout] = new DeviceWorker(info, () => backend.OpenSession(info), layout.Cfg.MaxFps, journal);
+            _workers[layout] = new DeviceWorker(info, () => openSession(info), layout.Cfg.MaxFps, journal);
         }
     }
 
