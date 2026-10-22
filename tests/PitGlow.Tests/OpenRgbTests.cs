@@ -16,7 +16,7 @@ public class ProtocolTests
     [InlineData(4u)]
     public void ControllerDataRoundTrips(uint protocol)
     {
-        var data = FakeOpenRgbServer.UserRig()[1].Data with
+        var data = FakeOpenRgbServer.UserRig()[2].Data with
         {
             Zones = [new ZoneData("Matrix", 2, 0, 4, 4, 2, 2, [0, 1, 2, 3])],
             Leds = [.. Enumerable.Range(0, 4).Select(i => new LedData($"L{i}", (uint)i))],
