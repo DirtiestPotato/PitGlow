@@ -17,7 +17,7 @@ jobs:
           dotnet-version: '8.0.x'
 
       - name: Test
-        run: dotnet test tests/PitGlow.Tests/PitGlow.Tests.csproj -c Release --logger "console;verbosity=normal" --logger "trx;LogFileName=results.trx"
+        run: dotnet test tests/PitGlow.Tests/PitGlow.Tests.csproj -c Release --logger GitHubActions --logger "console;verbosity=normal" --logger "trx;LogFileName=results.trx"
 
       - name: Upload test results
         if: always()

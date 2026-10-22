@@ -124,7 +124,7 @@ public sealed class DeviceWorker
                     _backedOff = false;   // the next driving session may take the device again
                     if (_engaged)
                     {
-                        _session.Release();
+                        _session!.Release();
                         _engaged = false;
                         _lastSent = null;
                         _journal?.Remove(Info);
@@ -135,13 +135,13 @@ public sealed class DeviceWorker
                 if (!_engaged)
                 {
                     _journal?.Add(Info);
-                    _session.Acquire();
+                    _session!.Acquire();
                     _engaged = true;
                     _lastSent = null;
                 }
                 if (!Same(want, _lastSent) || Clock.Now - _lastSendTime > KeepaliveSeconds)
                 {
-                    _session.Write(want);
+                    _session!.Write(want);
                     _lastSent = want;
                     _lastSendTime = Clock.Now;
                     SentFrames++;
