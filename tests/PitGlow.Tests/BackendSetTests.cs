@@ -80,7 +80,7 @@ public class BackendSetTests
         var result = set.Discover(TimeSpan.FromSeconds(1));
         Assert.Equal(7, result.Devices.Count);
         var cfg = Suggest.Config(result.Devices);
-        Assert.Equal(6, cfg.Devices.Count(d => d.Backend == "icue" && d.Zones.Single().Role == Roles.Tach));
+        Assert.Equal(6, cfg.Devices.Count(d => d.Backend == "icue" && d.Zones.Count == 1 && d.Zones[0].Role == Roles.Tach));
         Assert.Single(cfg.Devices, d => d.Backend == "icue" && d.Role == Roles.Flags);   // the pump
         var plan = Layouts.Build(cfg, result.Devices);
         Assert.Empty(plan.Problems);

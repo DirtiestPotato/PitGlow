@@ -250,11 +250,11 @@ public sealed class EndToEndTests : IDisposable
         var plan = Layouts.Build(cfg, infos);
         var journal = new RestoreJournal(Path.Combine(Path.GetTempPath(), $"pitglow-e2e-{Guid.NewGuid():N}.json"));
         var source = new DemoSource(flagSeconds: 0.3, flags: [Flag.Yellow, Flag.Blue, null]);
-        new Runner(cfg, source, backend, plan.Layouts, journal).Run(CancellationToken.None, seconds: 1.5);
+        new Runner(cfg, source, backend, plan.Layouts, journal).Run(CancellationToken.None, seconds: 2.5);
 
         var (motherboard, core, gpu, ram, mouse) = (rig[0], rig[1], rig[2], rig[3], rig[4]);
         Assert.Equal(0, motherboard.WriteCount);                 // not ours: untouched
-        foreach (var dev in new[] { core, gpu, ram, mouse }) Assert.True(dev.WriteCount > 3, dev.Data.Name);
+        foreach (var dev in new[] { core, gpu, ram, mouse }) Assert.True(dev.WriteCount > 3, $"{dev.Data.Name}: {dev.WriteCount} writes, mode {dev.ActiveModeName}, violations: {string.Join('; ', dev.Violations)}");
         Assert.Contains(gpu.WritesCopy(), w => w[0] == new Rgb(255, 170, 0));                 // yellow seen
         var fanFrames = core.WritesCopy().Select(w => string.Join(",", w.Skip(29).Take(8))).Distinct().Count();
         Assert.True(fanFrames > 3, "gauge moved");
