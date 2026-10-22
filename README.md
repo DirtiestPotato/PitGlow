@@ -37,6 +37,16 @@ In `Documents\My Games\Wreckfest 2\<your id>\savegame\telemetry\config.json`, se
 ### BeamNG.drive
 Options → Other → Protocols → turn on **OutGauge UDP**, IP `127.0.0.1`, port `4444`.
 
+## Philips Hue
+
+Hue lights show the race flags (and the rev color in games without flags) through your Hue Bridge, the same fast "Entertainment" streaming Hue Sync uses.
+
+1. In the Hue app: **Settings > Entertainment areas > Create**, and add the lights you want around your rig.
+2. Run **HueSetup.bat** and press the round button on top of the bridge when it asks. It pairs PitGlow and adds each Entertainment area to `pitglow.toml`.
+3. **Demo.bat** to see every flag on the lights, then **PitGlow.bat** and race.
+
+Only one app can stream to a Hue area at a time. If iCUE's Philips Hue integration (or Hue Sync) is on, turn it off while racing, or give PitGlow its own Entertainment area. When PitGlow stops, the lights go back to how they were.
+
 ## What's different from the Python version
 
 - **No Python, no setup scripts.** One `PitGlow.exe`.

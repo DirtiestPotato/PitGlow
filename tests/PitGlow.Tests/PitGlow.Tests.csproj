@@ -16,6 +16,7 @@
     <ProjectReference Include="..\..\src\PitGlow.OpenRgb\PitGlow.OpenRgb.csproj" />
     <ProjectReference Include="..\..\src\PitGlow.Cli\PitGlow.Cli.csproj" />
     <ProjectReference Include="..\..\src\PitGlow.RgbNet\PitGlow.RgbNet.csproj" />
+    <ProjectReference Include="..\..\src\PitGlow.Hue\PitGlow.Hue.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />

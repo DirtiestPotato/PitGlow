@@ -41,6 +41,16 @@ public sealed class DeviceCfg
         (Location ?? "") == (o.Location ?? "") && Zones.SequenceEqual(o.Zones);
 }
 
+/// <summary>Philips Hue Bridge pairing, written by "PitGlow hue" (HueSetup.bat).</summary>
+public sealed class HueCfg
+{
+    public bool Enabled { get; set; } = true;
+    public string Bridge { get; set; } = "";      // bridge IP address
+    public string AppKey { get; set; } = "";      // hue-application-key from pairing
+    public string ClientKey { get; set; } = "";   // streaming key from pairing (hex)
+    public bool Paired => Bridge.Length > 0 && AppKey.Length > 0 && ClientKey.Length > 0;
+}
+
 public sealed class GameCfg
 {
     public static readonly string[] Sources = ["auto", "iracing", "acevo", "acrally", "wreckfest2", "beamng", "demo"];
@@ -56,6 +66,7 @@ public sealed class Settings
     public bool OpenRgbEnabled { get; set; } = true;
     public bool ICueEnabled { get; set; } = true;
     public bool RazerEnabled { get; set; } = true;
+    public HueCfg Hue { get; set; } = new();
     public GameCfg Game { get; set; } = new();
     public TachStyle Tach { get; set; } = new();
     public double FlagBrightness { get; set; } = 1.0;

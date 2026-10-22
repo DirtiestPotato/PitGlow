@@ -5,6 +5,7 @@ using PitGlow.Backends;
 using PitGlow.Config;
 using PitGlow.Devices;
 using PitGlow.Engine;
+using PitGlow.Hue;
 using PitGlow.OpenRgb;
 using PitGlow.RgbNet;
 using PitGlow.Rendering;
@@ -54,6 +55,7 @@ public static class Program
                 "calibrate" => Calibrate(args),
                 "demo" => Demo(args),
                 "run" => Run(args),
+                "hue" => HueSetup.Run(args.Config, args.HostGiven ? args.Host : null),
                 "telemetry" => TelemetryCheck.Run(
                     Path.Combine(Path.GetDirectoryName(Path.GetFullPath(args.Config)) ?? ".", "telemetry-check.txt"), args.Seconds ?? 60),
                 _ => Usage(),
@@ -87,7 +89,7 @@ public static class Program
 
     private static void PrintUsage() => Console.WriteLine(
         $"Potato PitGlow {typeof(Program).Assembly.GetName().Version?.ToString(3)}\n" +
-        "usage: PitGlow [run|demo|devices|init|calibrate|telemetry] [--config FILE] [--host H] [--port P]\n" +
+        "usage: PitGlow [run|demo|devices|init|calibrate|telemetry|hue] [--config FILE] [--host H] [--port P]\n" +
         "               [--game iracing|acevo|acrally|wreckfest2|beamng] [--seconds N] [--force]");
 
     public static Args ParseArgs(string[] argv)
@@ -99,7 +101,7 @@ public static class Program
             string Next() => i + 1 < argv.Length ? argv[++i] : throw new ArgumentException($"{arg} needs a value");
             switch (arg)
             {
-                case "run" or "demo" or "devices" or "init" or "calibrate" or "telemetry": a.Command = arg; break;
+                case "run" or "demo" or "devices" or "init" or "calibrate" or "telemetry" or "hue": a.Command = arg; break;
                 case "--config": a.Config = Next(); break;
                 case "--host": a.Host = Next(); a.HostGiven = true; break;
                 case "--port": a.Port = int.Parse(Next(), CultureInfo.InvariantCulture); a.PortGiven = true; break;
@@ -126,6 +128,7 @@ public static class Program
             if (cfg?.ICueEnabled != false) list.Add(RgbNetBackend.Corsair());
             if (cfg?.RazerEnabled != false) list.Add(RgbNetBackend.Razer());
         }
+        if (cfg is { Hue: { Enabled: true, Paired: true } }) list.Add(new HueBackend(cfg.Hue));
         if (cfg?.OpenRgbEnabled != false)
             list.Add(new OpenRgbBackend(args.HostGiven || cfg is null ? args.Host : cfg.Host,
                                         args.PortGiven || cfg is null ? args.Port : cfg.Port));
@@ -169,6 +172,8 @@ public static class Program
         Console.WriteLine("Lighting routes:");
         var infos = DiscoverAll(Backends(args, null)).Devices;
         var cfg = Suggest.Config(infos);
+        if (File.Exists(args.Config))   // --force: keep the Hue pairing
+            try { cfg.Hue = SettingsFile.Load(args.Config).Hue; } catch (ConfigException) { /* unreadable: start over */ }
         cfg.Host = args.Host;
         cfg.Port = args.Port;
         SettingsFile.Save(cfg, args.Config);

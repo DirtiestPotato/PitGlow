@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>PitGlow.Hue</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\PitGlow.Core\PitGlow.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- BouncyCastle (MIT): DTLS 1.2 PSK for Hue Entertainment streaming -->
+    <PackageReference Include="BouncyCastle.Cryptography" Version="2.5.1" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="PitGlow.Tests" />
+  </ItemGroup>
+</Project>

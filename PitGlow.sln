@@ -13,6 +13,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PitGlow.Tests", "tests\PitG
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PitGlow.RgbNet", "src\PitGlow.RgbNet\PitGlow.RgbNet.csproj", "{DE3F2701-BBAE-520E-BC4C-827073CAAE6C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PitGlow.Hue", "src\PitGlow.Hue\PitGlow.Hue.csproj", "{8BAF4EE1-F119-43E0-BA2F-775ADDF60AB2}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -39,5 +41,9 @@ Global
 		{DE3F2701-BBAE-520E-BC4C-827073CAAE6C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{DE3F2701-BBAE-520E-BC4C-827073CAAE6C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{DE3F2701-BBAE-520E-BC4C-827073CAAE6C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8BAF4EE1-F119-43E0-BA2F-775ADDF60AB2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8BAF4EE1-F119-43E0-BA2F-775ADDF60AB2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8BAF4EE1-F119-43E0-BA2F-775ADDF60AB2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8BAF4EE1-F119-43E0-BA2F-775ADDF60AB2}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

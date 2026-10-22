@@ -52,6 +52,10 @@ public static class Suggest
                     cfg.Devices.Add(pump);
                 }
             }
+            else if (info.Kind == DeviceKind.Light && info.Backend == "hue")
+            {
+                cfg.Devices.Add(Whole(info, 25));   // Hue Entertainment area: flags on every light
+            }
             else if (info.Kind == DeviceKind.Mouse)
             {
                 cfg.Devices.Add(Whole(info, 20));

@@ -31,6 +31,14 @@ public static class SettingsFile
         cfg.OpenRgbEnabled = Bool(rgb, "enabled", true);
         cfg.ICueEnabled = Bool(Table(data, "icue"), "enabled", true);
         cfg.RazerEnabled = Bool(Table(data, "razer"), "enabled", true);
+        var hue = Table(data, "hue");
+        cfg.Hue = new HueCfg
+        {
+            Enabled = Bool(hue, "enabled", true),
+            Bridge = Str(hue, "bridge", ""),
+            AppKey = Str(hue, "app_key", ""),
+            ClientKey = Str(hue, "client_key", ""),
+        };
 
         var game = Table(data, "game");
         cfg.Game = new GameCfg
@@ -222,6 +230,13 @@ public static class SettingsFile
             "[razer]",
             "# Razer devices through Razer Synapse (Chroma).",
             $"enabled = {B(cfg.RazerEnabled)}",
+            "",
+            "[hue]",
+            "# Philips Hue lights through the Hue Bridge (Entertainment areas). Run HueSetup.bat to pair.",
+            $"enabled = {B(cfg.Hue.Enabled)}",
+            $"bridge = {S(cfg.Hue.Bridge)}",
+            $"app_key = {S(cfg.Hue.AppKey)}",
+            $"client_key = {S(cfg.Hue.ClientKey)}",
             "",
             "[game]",
             "# auto | iracing | acevo | acrally | wreckfest2 | beamng | demo",
