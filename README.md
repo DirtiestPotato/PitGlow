@@ -50,6 +50,7 @@ Options → Other → Protocols → turn on **OutGauge UDP**, IP `127.0.0.1`, po
 - *"OpenRGB is not responding"*: it's still detecting devices, or a device driver has hung. Wait for detection to finish; if it never does, shut down, switch the power supply off for 30 seconds, and start again.
 - *A fan stays dark:* run Devices.bat. If its zone shows 0 LEDs, set the size in OpenRGB (8 for most fans).
 - *RAM missing:* run OpenRGB as administrator.
+- *Lights don't react in a game:* start the game, get in the car, run **Telemetry.bat** and drive for a minute. It shows what PitGlow reads from the game and saves `telemetry-check.txt`.
 - `pitglow.log` next to PitGlow.exe records problems.
 
 ## Building

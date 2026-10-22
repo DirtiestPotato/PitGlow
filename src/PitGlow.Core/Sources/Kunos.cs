@@ -12,7 +12,7 @@ public abstract class KunosSource(Func<string, IMemoryBlock>? opener) : ITelemet
     public const double StaleSeconds = 1.5;
 
     private readonly Func<string, IMemoryBlock> _opener = opener ?? (name => new SharedBlock(name));
-    private int? _lastPacket;
+    private long? _lastPacket;
     private double _lastChange;
 
     protected abstract string Prefix { get; }
@@ -45,19 +45,24 @@ public abstract class KunosSource(Func<string, IMemoryBlock>? opener) : ITelemet
         Physics = Graphics = Static = null;
     }
 
-    /// <summary>Physics packetId must keep moving; a closed game leaves stale data.</summary>
+    /// <summary>
+    /// The physics page must keep changing; a closed or paused game leaves stale data.
+    /// packetId is the usual heartbeat, but AC Rally doesn't always advance it, so any
+    /// change in the first 64 bytes (packet, pedals, gear, rpm, speed, velocity, g-forces)
+    /// counts as a beat too.
+    /// </summary>
     private bool Fresh(double now)
     {
-        int packet = Physics!.Read<int>(0);
+        long beat = Heartbeat(Physics!);
         if (_lastPacket is null)   // need to see it move at least once
         {
-            _lastPacket = packet;
+            _lastPacket = beat;
             _lastChange = now;
             return false;
         }
-        if (packet != _lastPacket)
+        if (beat != _lastPacket)
         {
-            _lastPacket = packet;
+            _lastPacket = beat;
             _lastChange = now;
             return true;
         }
@@ -67,6 +72,13 @@ public abstract class KunosSource(Func<string, IMemoryBlock>? opener) : ITelemet
             return false;
         }
         return true;
+    }
+
+    internal static long Heartbeat(IMemoryBlock physics)
+    {
+        long h = 17;
+        for (int off = 0; off < 64; off += 8) h = h * 31 + physics.Read<long>(off);
+        return h;
     }
 
     public Sample? Read(double now)
@@ -119,19 +131,30 @@ public sealed class ACEvoSource(Func<string, IMemoryBlock>? opener = null) : Kun
 /// <summary>AC Rally, ACC and AC1 (Local\acpmf_*): RPM, max RPM and pit limiter.</summary>
 public sealed class ACClassicSource(Func<string, IMemoryBlock>? opener = null) : KunosSource(opener)
 {
+    public const int AcReplay = 1, AcPause = 3;
+
     protected override string Prefix => @"Local\acpmf_";
     public override string Game => "Assetto Corsa Rally / ACC / AC";
 
     protected override Sample? Build()
     {
         var p = Physics!;
-        if (Graphics is not null && Graphics.Read<int>(4) != AcLive) return null;
-        int top = Static?.Read<int>(412) ?? 0;                  // maxRpm
+        // ACC and AC1 report replay/pause here. AC Rally leaves the graphics page blank
+        // (status 0), so only an explicit replay or pause turns the lights off.
+        int status = Graphics?.Read<int>(4) ?? AcLive;
+        if (status is AcReplay or AcPause) return null;
+        double? top = Plausible(Static?.Read<int>(412) ?? 0) ?? CurrentMaxRpm(p);
         return new Sample(Game)
         {
-            Rpm = p.Read<int>(20),
-            MaxRpm = top > 0 ? top : null,
-            PitLimiter = p.Read<int>(248) != 0,
+            Rpm = Math.Max(0, p.Read<int>(20)),
+            MaxRpm = top,
+            PitLimiter = p.Read<int>(248) == 1,
         };
     }
+
+    /// <summary>physics.currentMaxRpm: an int in ACC, a float in some AC Rally builds.</summary>
+    internal static double? CurrentMaxRpm(IMemoryBlock p) =>
+        Plausible(p.Read<int>(588)) ?? Plausible(p.Read<float>(588));
+
+    private static double? Plausible(double rpm) => rpm is >= 1000 and <= 30000 ? rpm : null;
 }

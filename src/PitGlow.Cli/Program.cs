@@ -54,6 +54,8 @@ public static class Program
                 "calibrate" => Calibrate(args),
                 "demo" => Demo(args),
                 "run" => Run(args),
+                "telemetry" => TelemetryCheck.Run(
+                    Path.Combine(Path.GetDirectoryName(Path.GetFullPath(args.Config)) ?? ".", "telemetry-check.txt"), args.Seconds ?? 60),
                 _ => Usage(),
             };
         }
@@ -85,7 +87,7 @@ public static class Program
 
     private static void PrintUsage() => Console.WriteLine(
         $"Potato PitGlow {typeof(Program).Assembly.GetName().Version?.ToString(3)}\n" +
-        "usage: PitGlow [run|demo|devices|init|calibrate] [--config FILE] [--host H] [--port P]\n" +
+        "usage: PitGlow [run|demo|devices|init|calibrate|telemetry] [--config FILE] [--host H] [--port P]\n" +
         "               [--game iracing|acevo|acrally|wreckfest2|beamng] [--seconds N] [--force]");
 
     public static Args ParseArgs(string[] argv)
@@ -97,7 +99,7 @@ public static class Program
             string Next() => i + 1 < argv.Length ? argv[++i] : throw new ArgumentException($"{arg} needs a value");
             switch (arg)
             {
-                case "run" or "demo" or "devices" or "init" or "calibrate": a.Command = arg; break;
+                case "run" or "demo" or "devices" or "init" or "calibrate" or "telemetry": a.Command = arg; break;
                 case "--config": a.Config = Next(); break;
                 case "--host": a.Host = Next(); a.HostGiven = true; break;
                 case "--port": a.Port = int.Parse(Next(), CultureInfo.InvariantCulture); a.PortGiven = true; break;

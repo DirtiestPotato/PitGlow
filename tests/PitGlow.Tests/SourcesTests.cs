@@ -136,6 +136,34 @@ public class KunosTests
         Assert.Equal((6400.0, 7800.0), (s.Rpm, s.MaxRpm!.Value));
         Assert.Empty(s.Flags);
     }
+
+    [Fact]
+    public void RallyWithBlankGraphicsAndStuckPacketCounterStillWorks()
+    {
+        var physics = new byte[800];
+        var graphics = new byte[1588];     // AC Rally creates it but leaves status 0
+        var stat = new byte[784];          // and no maxRpm
+        Put(physics, 20, 3000);
+        BinaryPrimitives.WriteSingleLittleEndian(physics.AsSpan(588), 7200f);   // currentMaxRpm as float
+        var src = new ACClassicSource(Opener(new()
+        {
+            [@"Local\acpmf_physics"] = physics, [@"Local\acpmf_graphics"] = graphics, [@"Local\acpmf_static"] = stat,
+        }));
+        Assert.Null(src.Read(0.0));
+        Put(physics, 20, 3200);            // packetId stays 0; the revs move
+        var s = src.Read(0.05)!;
+        Assert.Equal((3200.0, 7200.0), (s.Rpm, s.MaxRpm!.Value));
+        Put(physics, 20, 3300);
+        Assert.NotNull(src.Read(1.0));
+        Put(graphics, 4, 3);               // an explicit pause still turns the lights off
+        Put(physics, 20, 3400);
+        Assert.Null(src.Read(1.1));
+        Put(graphics, 4, 0);
+        Assert.NotNull(src.Read(1.2));
+        Assert.Null(src.Read(3.0));        // frozen for > 1.5 s: game paused or closed
+        Put(physics, 588, 7600);           // ACC stores currentMaxRpm as an int
+        Assert.Equal(7600.0, ACClassicSource.CurrentMaxRpm(new BytesBlock(physics)));
+    }
 }
 
 public class UdpTests
