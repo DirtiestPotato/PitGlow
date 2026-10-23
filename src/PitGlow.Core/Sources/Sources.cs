@@ -108,7 +108,7 @@ public static class SourceFactory
             ["iracing"] = () => new IRacingSource(),
             ["acevo"] = () => new ACEvoSource(),
             ["acrally"] = () => new ACClassicSource(),
-            ["wreckfest2"] = () => new Wreckfest2Source(game.Wreckfest2Port),
+            ["wreckfest2"] = () => new Wreckfest2Source(game.Wreckfest2Port, keeper: OperatingSystem.IsWindows() ? new Wreckfest2Config(game.Wreckfest2Port) : null),
             ["beamng"] = () => new BeamNGSource(game.BeamngPort),
         };
         if (game.Source == "auto") return new AutoSource([.. table.Values.Select(make => make())]);

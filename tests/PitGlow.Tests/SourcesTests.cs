@@ -272,3 +272,72 @@ public class AutoTests
         Assert.False(demo.Read(16).PitLimiter);
     }
 }
+
+public class Wreckfest2ConfigTests
+{
+    // Exactly what Sim Racing Studio writes when it starts.
+    private const string SrsConfig = """
+        {
+            "udp": [
+                {
+                    "enabled": 1,
+                    "ip": "127.0.0.1",
+                    "port": "23123"
+                }
+            ],
+            "logging": [ { "format": "none" } ],
+            "server": [ { "enabled": 0, "automaticMainCar": 0 } ]
+        }
+        """;
+
+    private static System.Text.Json.Nodes.JsonArray Udp(string json) =>
+        (System.Text.Json.Nodes.JsonArray)System.Text.Json.Nodes.JsonNode.Parse(json)!["udp"]!;
+
+    [Fact]
+    public void AddsPitGlowNextToTheMotionRig()
+    {
+        var fixedText = Wreckfest2Config.Ensure(SrsConfig, 23124)!;
+        var udp = Udp(fixedText);
+        Assert.Equal(2, udp.Count);
+        Assert.Equal("23123", udp[0]!["port"]!.ToString());                 // rig untouched
+        Assert.Equal(("23124", "127.0.0.1", "1"), (udp[1]!["port"]!.ToString(), udp[1]!["ip"]!.ToString(), udp[1]!["enabled"]!.ToString()));
+        Assert.Contains("automaticMainCar", fixedText);                       // rest of the file kept
+        Assert.Null(Wreckfest2Config.Ensure(fixedText, 23124));               // already there: no rewrite
+    }
+
+    [Fact]
+    public void ReEnablesADisabledEntryAndHandlesOddFiles()
+    {
+        var disabled = SrsConfig.Replace("\"port\": \"23123\"", "\"port\": 23124").Replace("\"enabled\": 1,\n            \"ip\"", "\"enabled\": 0,\n            \"ip\"");
+        var udp = Udp(Wreckfest2Config.Ensure(disabled.Replace("\"enabled\": 1", "\"enabled\": 0"), 23124)!);
+        Assert.Single(udp);
+        Assert.Equal("1", udp[0]!["enabled"]!.ToString());
+        Assert.Single(Udp(Wreckfest2Config.Ensure("{}", 23124)!));
+        Assert.Null(Wreckfest2Config.Ensure(SrsConfig, 23123));               // old setups on 23123 are left alone
+    }
+
+    [Fact]
+    public void KeeperPutsTheEntryBackAfterARewrite()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "pitglow-wf2-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        var path = Path.Combine(dir, "config.json");
+        try
+        {
+            File.WriteAllText(path, SrsConfig);
+            var keeper = new Wreckfest2Config(23124, () => [path]);
+            keeper.Check(0);
+            Assert.Equal(2, Udp(File.ReadAllText(path)).Count);
+            File.WriteAllText(path, SrsConfig);                                // motion software starts again
+            File.SetLastWriteTimeUtc(path, DateTime.UtcNow.AddSeconds(5));
+            keeper.Check(1);                                                   // too soon after our own write
+            Assert.Single(Udp(File.ReadAllText(path)));
+            keeper.Check(11);
+            Assert.Equal(2, Udp(File.ReadAllText(path)).Count);
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
+}

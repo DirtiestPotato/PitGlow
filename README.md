@@ -41,6 +41,8 @@ In `Documents\My Games\Wreckfest 2\<your id>\savegame\telemetry\config.json`, ad
 ],
 ```
 
+Motion software such as Sim Racing Studio rewrites this file with only its own entry each time it starts. While PitGlow is running it adds its entry back automatically (and never touches the others), so start your motion software, then PitGlow, then the game.
+
 ### BeamNG.drive
 Options → Other → Protocols → turn on **OutGauge UDP**, IP `127.0.0.1`, port `4444`.
 
