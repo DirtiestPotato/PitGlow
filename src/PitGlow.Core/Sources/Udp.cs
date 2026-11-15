@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using System.Net;
 using System.Net.Sockets;
+using PitGlow.Engine;
 
 namespace PitGlow.Sources;
 
@@ -15,8 +16,10 @@ public abstract class UdpSource(int port, string host) : ITelemetrySource
     private readonly byte[] _buffer = new byte[4096];
 
     public abstract string Game { get; }
-    public string? Error { get; private set; }
+    public string? Error { get; protected set; }
     public int Port => port;
+    /// <summary>When the last valid packet arrived (any packet, driving or not); null before the first.</summary>
+    protected double? LastPacket { get; private set; }
 
     private void Drain(double now)
     {
@@ -59,6 +62,7 @@ public abstract class UdpSource(int port, string host) : ITelemetrySource
             {
                 _latest = packet;
                 _received = now;
+                LastPacket = now;
             }
         }
     }
@@ -84,7 +88,7 @@ public abstract class UdpSource(int port, string host) : ITelemetrySource
 /// Wreckfest 2. Enable in Documents\My Games\Wreckfest 2\&lt;id&gt;\savegame\telemetry\config.json.
 /// Packet layout: TelemetryDataFormatPino.h (pack 1), Main packet = type 0.
 /// </summary>
-public sealed class Wreckfest2Source(int port = 23124, string host = "127.0.0.1", Wreckfest2Config? keeper = null) : UdpSource(port, host)
+public sealed class Wreckfest2Source(int port = 23124, string host = "127.0.0.1", Wreckfest2Config? keeper = null, Func<bool>? gameRunning = null) : UdpSource(port, host)
 {
     public const uint Signature = 1869769584;
     public const int MainMinSize = 1092;
@@ -126,12 +130,47 @@ public sealed class Wreckfest2Source(int port = 23124, string host = "127.0.0.1"
         };
     }
 
+    /// <summary>Seconds the game may run without sending anything before PitGlow says so.</summary>
+    public const double SilentGameSeconds = 20.0;
+
+    private readonly Func<bool> _gameRunning = gameRunning ?? (() => System.Diagnostics.Process.GetProcessesByName("Wreckfest2").Length > 0);
+    private double _nextProcessCheck;
+    private double? _runningSince;
+
     public override Sample? Read(double now)
     {
         keeper?.Check(now);   // motion software may have rewritten the game's telemetry list
         var sample = base.Read(now);
+        CheckSilence(now);
         return ReferenceEquals(sample, NotDriving) ? null : sample;
     }
+
+    /// <summary>
+    /// The game reads its telemetry list once at startup. If motion software rewrote the list just
+    /// then, the game runs without sending PitGlow anything: say so instead of staying dark.
+    /// </summary>
+    private void CheckSilence(double now)
+    {
+        if (now < _nextProcessCheck) return;
+        _nextProcessCheck = now + 2.0;
+        if (!_gameRunning())
+        {
+            _runningSince = null;
+            if (Error == SilentWarning) Error = null;
+            return;
+        }
+        _runningSince ??= now;
+        bool silent = LastPacket is null || LastPacket < _runningSince;
+        if (silent && now - _runningSince > SilentGameSeconds)
+        {
+            if (Error != SilentWarning) Log.Warn(SilentWarning);
+            Error = SilentWarning;
+        }
+        else if (!silent && Error == SilentWarning) Error = null;
+    }
+
+    public const string SilentWarning =
+        "Wreckfest 2 is running but no telemetry reaches PitGlow: forward it from your motion software to 127.0.0.1:23124, or enable an entry for that port (see README)";
 }
 
 /// <summary>BeamNG.drive OutGauge (Options &gt; Other &gt; Protocols &gt; OutGauge UDP).</summary>

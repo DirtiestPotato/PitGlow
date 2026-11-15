@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 using PitGlow;
 using PitGlow.Backends;
 using PitGlow.Config;
+using PitGlow.CorsairHub;
 using PitGlow.Devices;
 using PitGlow.Engine;
 using PitGlow.Hue;
@@ -26,6 +27,7 @@ public static class Program
         public int Port = 6742;
         public bool HostGiven, PortGiven;
         public string? Game;
+        public string? Mode;
         public double? Seconds;
         public bool Force;
         public bool ConsoleOnly;
@@ -49,6 +51,8 @@ public static class Program
         Log.Path = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(args.Config)) ?? ".", "pitglow.log");
         try
         {
+            if (args.Command is "run" or "demo" or "devices" or "calibrate" or "init" && Elevation.RelaunchForICue(argv))
+                return 0;
             return args.Command switch
             {
                 "devices" => Devices(args),
@@ -103,7 +107,7 @@ public static class Program
     private static void PrintUsage() => Console.WriteLine(
         $"Potato PitGlow {typeof(Program).Assembly.GetName().Version?.ToString(3)}\n" +
         "usage: PitGlow [run|demo|devices|init|calibrate|telemetry|hue|hue-bt|hue-bt-check] [--config FILE] [--host H] [--port P]\n" +
-        "               [--game iracing|acevo|acrally|wreckfest2|beamng] [--seconds N] [--force]");
+        "               [--game iracing|acevo|acrally|wreckfest2|beamng] [--mode traditional|all] [--seconds N] [--force]");
 
     public static Args ParseArgs(string[] argv)
     {
@@ -119,9 +123,14 @@ public static class Program
                 case "--host": a.Host = Next(); a.HostGiven = true; break;
                 case "--port": a.Port = int.Parse(Next(), CultureInfo.InvariantCulture); a.PortGiven = true; break;
                 case "--game": a.Game = Next(); break;
+                case "--mode":
+                    a.Mode = Next();
+                    if (a.Mode is not ("traditional" or "all")) throw new ArgumentException("--mode must be traditional or all");
+                    break;
                 case "--seconds": a.Seconds = double.Parse(Next(), CultureInfo.InvariantCulture); break;
                 case "--force": a.Force = true; break;
                 case "--console": a.ConsoleOnly = true; break;
+                case Elevation.RelaunchedFlag: break;   // set by the admin relaunch; nothing to do
                 case "-h" or "--help" or "help": a.Command = "help"; break;
                 default: throw new ArgumentException($"Unknown argument: {arg}");
             }
@@ -138,6 +147,7 @@ public static class Program
         var list = new List<IBackend>();
         if (IncludeVendorBackends)
         {
+            if (cfg?.CorsairHubEnabled != false) list.Add(new CorsairHubBackend());
             if (cfg?.ICueEnabled != false) list.Add(RgbNetBackend.Corsair());
             if (cfg?.RazerEnabled != false) list.Add(RgbNetBackend.Razer());
             if (cfg?.HueBluetoothEnabled != false) list.Add(new HueBluetoothBackend());
@@ -223,6 +233,7 @@ public static class Program
     private static (BackendSet Backends, IReadOnlyList<DeviceInfo> Infos, LayoutPlan Plan, RestoreJournal Journal)
         Prepare(Args args, Settings cfg)
     {
+        if (IncludeVendorBackends) AppStarter.Ensure(cfg);
         var set = Backends(args, cfg);
         var journal = new RestoreJournal(RestoreJournal.DefaultPath());
         Console.WriteLine("Lighting routes:");
@@ -283,6 +294,7 @@ public static class Program
         if (!EnsureConfig(args)) return 1;
         var cfg = SettingsFile.Load(args.Config);
         if (args.Game is not null) cfg.Game.Source = args.Game;
+        if (args.Mode is not null) cfg.Mode = args.Mode;
         return RunLoop(args, cfg, SourceFactory.Make(cfg.Game), args.Seconds);
     }
 
@@ -290,8 +302,15 @@ public static class Program
     {
         if (!EnsureConfig(args)) return 1;
         var cfg = SettingsFile.Load(args.Config);
+        if (args.Mode is not null) cfg.Mode = args.Mode;
         Console.WriteLine("Demo: fake RPM sweeps on the fans, every flag in turn on the flag devices " +
                           "(4 s each), pit limiter at 12-15 s.");
+        if (cfg.Mode == "all")
+        {
+            // All-zones mode: 8 s of RPM sweeps on every zone, then 4 s of the next flag.
+            Console.WriteLine("All-zones mode: every zone shows RPM for 8 s, then the next flag for 4 s.");
+            return RunLoop(args, cfg, new DemoSource(flags: DemoSource.AllZonesFlags), args.Seconds ?? 150);
+        }
         return RunLoop(args, cfg, new DemoSource(), args.Seconds ?? 60);
     }
 

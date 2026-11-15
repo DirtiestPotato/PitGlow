@@ -18,5 +18,6 @@
     <ProjectReference Include="..\PitGlow.RgbNet\PitGlow.RgbNet.csproj" />
     <ProjectReference Include="..\PitGlow.Hue\PitGlow.Hue.csproj" />
     <ProjectReference Include="..\PitGlow.HueBluetooth\PitGlow.HueBluetooth.csproj" />
+    <ProjectReference Include="..\PitGlow.CorsairHub\PitGlow.CorsairHub.csproj" />
   </ItemGroup>
 </Project>

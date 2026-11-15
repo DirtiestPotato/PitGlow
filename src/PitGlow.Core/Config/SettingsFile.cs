@@ -30,6 +30,9 @@ public static class SettingsFile
         cfg.Port = Int(rgb, "port", cfg.Port);
         cfg.OpenRgbEnabled = Bool(rgb, "enabled", true);
         cfg.ICueEnabled = Bool(Table(data, "icue"), "enabled", true);
+        cfg.ICueMaxFps = Dbl(Table(data, "icue"), "max_fps", cfg.ICueMaxFps);
+        cfg.ICueHoldControl = Bool(Table(data, "icue"), "hold_control", true);
+        cfg.CorsairHubEnabled = Bool(Table(data, "corsair_hub"), "enabled", true);
         cfg.RazerEnabled = Bool(Table(data, "razer"), "enabled", true);
         cfg.HueBluetoothEnabled = Bool(Table(data, "hue_bluetooth"), "enabled", true);
         var hue = Table(data, "hue");
@@ -40,16 +43,22 @@ public static class SettingsFile
             AppKey = Str(hue, "app_key", ""),
             ClientKey = Str(hue, "client_key", ""),
         };
+        cfg.HueFlagsOnly = Bool(hue, "flags_only", true);
 
         var game = Table(data, "game");
         cfg.Game = new GameCfg
         {
             Source = Str(game, "source", "auto"),
             Wreckfest2Port = Int(game, "wreckfest2_port", 23124),
+            Wreckfest2ManageConfig = Bool(game, "wreckfest2_manage_config", false),
             BeamngPort = Int(game, "beamng_port", 4444),
         };
         if (!GameCfg.Sources.Contains(cfg.Game.Source))
             throw new ConfigException($"[game] source must be one of {string.Join(", ", GameCfg.Sources)}");
+
+        cfg.Mode = Str(Table(data, "lighting"), "mode", "traditional");
+        if (cfg.Mode is not ("traditional" or "all"))
+            throw new ConfigException($"[lighting] mode must be \"traditional\" or \"all\", not \"{cfg.Mode}\"");
 
         var t = Table(data, "tach");
         var d = new TachStyle();
@@ -227,6 +236,18 @@ public static class SettingsFile
             "[icue]",
             "# Corsair devices through Corsair iCUE (iCUE must be installed and running).",
             $"enabled = {B(cfg.ICueEnabled)}",
+            "# Most updates per second sent to each iCUE device (fans on one hub share it; higher can freeze them).",
+            $"max_fps = {N(cfg.ICueMaxFps)}",
+            "# true: keep the iCUE devices until PitGlow closes (between races they show when_clear under [flags]).",
+            "# false: hand them back to iCUE whenever you're not driving.",
+            $"hold_control = {B(cfg.ICueHoldControl)}",
+            "",
+            "[corsair_hub]",
+            "# Corsair Commander Core hubs (Elite Capellix coolers) driven directly, without iCUE: the pump",
+            "# ring and each fan show up as devices. PitGlow only sends colors; fan and pump speeds keep",
+            "# following the curves saved on the hub (iCUE > the cooler > Device Memory Mode > Cooling).",
+            "# Needs iCUE closed. Set false to drive the hub through iCUE instead.",
+            $"enabled = {B(cfg.CorsairHubEnabled)}",
             "",
             "[razer]",
             "# Razer devices through Razer Synapse (Chroma).",
@@ -242,12 +263,22 @@ public static class SettingsFile
             $"bridge = {S(cfg.Hue.Bridge)}",
             $"app_key = {S(cfg.Hue.AppKey)}",
             $"client_key = {S(cfg.Hue.ClientKey)}",
+            "# true: Hue lights (Bridge and Bluetooth) show flags only, and are off when no flag is out.",
+            $"flags_only = {B(cfg.HueFlagsOnly)}",
             "",
             "[game]",
             "# auto | iracing | acevo | acrally | wreckfest2 | beamng | demo",
             $"source = {S(cfg.Game.Source)}",
             $"wreckfest2_port = {cfg.Game.Wreckfest2Port}",
+            "# true: PitGlow keeps its entry in Wreckfest 2's telemetry list. Leave false with a motion rig",
+            "# (forward from Sim Racing Studio / SimHub to the port above instead).",
+            $"wreckfest2_manage_config = {B(cfg.Game.Wreckfest2ManageConfig)}",
             $"beamng_port = {cfg.Game.BeamngPort}",
+            "",
+            "[lighting]",
+            "# traditional: each zone follows its role (tach zones show RPM, flag zones show flags).",
+            "# all: every zone shows the RPM gauge; while a flag is out, every zone shows the flag.",
+            $"mode = {S(cfg.Mode)}",
             "",
             "[tach]",
             "# Color of each LED by its position on the dial (0.0 = first LED, 1.0 = last).",

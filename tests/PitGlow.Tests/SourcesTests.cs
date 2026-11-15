@@ -34,10 +34,30 @@ public class IRacingTests
              DriverCarSLBlinkRPM: 7400.000
             """;
         public bool IsConnected { get; private set; }
-        public bool Startup() => IsConnected = true;
-        public void Shutdown() => IsConnected = false;
+        public int Startups, Shutdowns;
+        public bool Startup() { Startups++; return IsConnected = true; }
+        public void Shutdown() { Shutdowns++; IsConnected = false; }
         public IRacingSnapshot? Read() => Snap;
         public string? SessionInfo() => Info;
+    }
+
+    [Fact]
+    public void NextRaceIsPickedUpAfterLeavingOne()
+    {
+        // Race 1 runs, you leave (telemetry freezes while the sim closes), race 2 starts fresh.
+        var fake = new FakeSdk();
+        var src = new IRacingSource(fake);
+        Assert.NotNull(src.Read(0.0));
+        Assert.Equal(1, fake.Startups);
+        for (double t = 0.5; t <= 6.0; t += 0.5) src.Read(t);         // frozen: nothing to show
+        Assert.Equal(1, fake.Shutdowns);                               // let go of the old session
+        fake.Snap = fake.Snap with { SessionTime = 0.1, Rpm = 3000 };  // new sim, new session clock
+        fake.Info = fake.Info.Replace("7200.000", "8100.000");         // and maybe a different car
+        Sample? s = null;
+        for (double t = 6.5; t <= 8.0 && s is null; t += 0.5) { s = src.Read(t); fake.Snap = fake.Snap with { SessionTime = fake.Snap.SessionTime + 0.5 }; }
+        Assert.NotNull(s);
+        Assert.Equal(2, fake.Startups);                                // reconnected from scratch
+        Assert.Equal(8100.0, s!.ShiftRpm);                             // new car's lights read again
     }
 
     [Fact]
@@ -117,6 +137,21 @@ public class KunosTests
         Assert.NotNull(src.Read(1.0));
         Assert.Null(src.Read(2.0));
         Assert.False(src.IsOpen);
+    }
+
+    [Fact]
+    public void LeftoverBlockThatNeverMovesIsNeverAGame()
+    {
+        // A closed game's block kept alive by another app: same bytes forever.
+        var physics = new byte[800];
+        Put(physics, 0, 41);
+        var src = new ACClassicSource(Opener(new() { [@"Local\acpmf_physics"] = physics }));
+        for (double t = 0; t < 10; t += 0.1)
+            Assert.Null(src.Read(t));
+        // When the game really starts, the page moves and it is picked up straight away.
+        Put(physics, 0, 42);
+        Put(physics, 20, 2500);
+        Assert.NotNull(src.Read(10.05));
     }
 
     [Fact]
@@ -201,6 +236,31 @@ public class UdpTests
         var other = Wf2Packet();
         other[4] = 4;                                          // not the Main packet
         Assert.Null(src.Parse(other));
+    }
+
+    [Fact]
+    public void SilentWreckfestIsReported()
+    {
+        int port;
+        using (var probe = new UdpClient(new IPEndPoint(IPAddress.Loopback, 0)))
+            port = ((IPEndPoint)probe.Client.LocalEndPoint!).Port;
+        bool running = false;
+        var src = new Wreckfest2Source(port, gameRunning: () => running);
+        src.Read(0);
+        Assert.Null(src.Error);                                        // game not running: nothing to say
+        running = true;
+        src.Read(2);
+        src.Read(25);
+        Assert.Equal(Wreckfest2Source.SilentWarning, src.Error);       // running 20+ s, no packets
+        using var tx = new UdpClient();
+        tx.Send(Wf2Packet(), new IPEndPoint(IPAddress.Loopback, port));
+        Thread.Sleep(100);
+        Assert.NotNull(src.Read(28));
+        Assert.Null(src.Error);                                        // telemetry arrived: warning cleared
+        running = false;
+        src.Read(31);
+        Assert.Null(src.Error);
+        src.Close();
     }
 
     [Fact]
@@ -314,6 +374,31 @@ public class Wreckfest2ConfigTests
         Assert.Equal("1", udp[0]!["enabled"]!.ToString());
         Assert.Single(Udp(Wreckfest2Config.Ensure("{}", 23124)!));
         Assert.Null(Wreckfest2Config.Ensure(SrsConfig, 23123));               // old setups on 23123 are left alone
+    }
+
+    [Fact]
+    public void KeeperRestoresTheEntryWithinMillisecondsOfARewrite()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "pitglow-wf2w-" + Guid.NewGuid().ToString("N"));
+        var path = Path.Combine(dir, "savegame", "telemetry", "config.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        try
+        {
+            File.WriteAllText(path, SrsConfig);
+            var keeper = new Wreckfest2Config(23124, watch: () => [path]);
+            keeper.Check(0);                                                   // fixes it and starts watching
+            Assert.Equal(2, Udp(File.ReadAllText(path)).Count);
+            keeper.Check(30);                                                  // well past the anti-fight window
+            File.WriteAllText(path, SrsConfig);                                // motion software, as the game starts
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            while (Udp(File.ReadAllText(path)).Count < 2 && sw.ElapsedMilliseconds < 2000) Thread.Sleep(10);
+            Assert.Equal(2, Udp(File.ReadAllText(path)).Count);
+            Assert.True(sw.ElapsedMilliseconds < 1000, $"took {sw.ElapsedMilliseconds} ms");   // no waiting for the next poll
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
     }
 
     [Fact]

@@ -1,4 +1,4 @@
-
+﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
@@ -16,6 +16,10 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PitGlow.Hue", "src\PitGlow.Hue\PitGlow.Hue.csproj", "{8BAF4EE1-F119-43E0-BA2F-775ADDF60AB2}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PitGlow.HueBluetooth", "src\PitGlow.HueBluetooth\PitGlow.HueBluetooth.csproj", "{C67CE117-2952-4EE6-819F-4DFE07D71D7F}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{DAE90907-E25E-4D58-9C48-B510DEED4D95}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PitGlow.CorsairHub", "src\PitGlow.CorsairHub\PitGlow.CorsairHub.csproj", "{82D78F21-D7B8-4C54-A769-C57F8E5A2CDA}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -51,5 +55,12 @@ Global
 		{C67CE117-2952-4EE6-819F-4DFE07D71D7F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C67CE117-2952-4EE6-819F-4DFE07D71D7F}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C67CE117-2952-4EE6-819F-4DFE07D71D7F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{82D78F21-D7B8-4C54-A769-C57F8E5A2CDA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{82D78F21-D7B8-4C54-A769-C57F8E5A2CDA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{82D78F21-D7B8-4C54-A769-C57F8E5A2CDA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{82D78F21-D7B8-4C54-A769-C57F8E5A2CDA}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{82D78F21-D7B8-4C54-A769-C57F8E5A2CDA} = {DAE90907-E25E-4D58-9C48-B510DEED4D95}
 	EndGlobalSection
 EndGlobal

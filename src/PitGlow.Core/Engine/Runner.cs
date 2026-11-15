@@ -39,9 +39,12 @@ public sealed class Runner
         foreach (var layout in layouts)
         {
             var info = layout.Info;
-            _workers[layout] = new DeviceWorker(info, () => openSession(info), layout.Cfg.MaxFps, journal);
+            double fps = info.Backend == "icue" ? Math.Min(layout.Cfg.MaxFps, cfg.ICueMaxFps) : layout.Cfg.MaxFps;
+            _workers[layout] = new DeviceWorker(info, () => openSession(info), fps, journal);
         }
     }
+
+    private bool HoldsControl(Layout layout) => _cfg.ICueHoldControl && layout.Info.Backend == "icue";
 
     public IEnumerable<DeviceWorker> Workers => _workers.Values;
     public Renderer Renderer => _renderer;
@@ -54,6 +57,8 @@ public sealed class Runner
         bool driving = false;
         double? idleSince = null;
         double nextStatus = 0;
+        double nextDiagnostics = 0;
+        string? lastGame = null;
         Sample? sample = null;
         _heartbeat = Clock.Now;
         using var watchdogStop = new CancellationTokenSource();
@@ -67,6 +72,17 @@ public sealed class Runner
                 _heartbeat = now;
                 if (seconds is double s && now - started >= s) break;
                 sample = _source.Read(now);
+                if ((sample?.Game) != lastGame)
+                {
+                    Log.Info(sample is null ? $"No game (was {lastGame})" : $"Game: {sample.Game} (mode {_cfg.Mode})");
+                    lastGame = sample?.Game;
+                }
+                if (driving && now >= nextDiagnostics)
+                {
+                    nextDiagnostics = now + 10;
+                    Log.Info($"Devices at {sample?.Rpm ?? 0:0} rpm, flag {(_renderer.Flag is Flag f ? f.ConfigName() : "none")}: " +
+                             string.Join(" | ", _workers.Values.Select(w => w.Diagnostics())));
+                }
                 if (sample is not null)
                 {
                     _renderer.Update(sample, now);
@@ -80,7 +96,11 @@ public sealed class Runner
                     idleSince ??= now;
                     if (now - idleSince > IdleRestoreSeconds)
                     {
-                        foreach (var w in _workers.Values) w.Submit(null);
+                        // Hand devices back between sessions, except iCUE ones when hold_control is on:
+                        // iCUE taking over and giving back every time the game loses focus wears on it,
+                        // so those keep PitGlow's idle look until PitGlow itself stops.
+                        foreach (var layout in _layouts)
+                            _workers[layout].Submit(HoldsControl(layout) ? _renderer.IdleFrame(layout) : null);
                         _renderer.Reset();
                         driving = false;
                     }

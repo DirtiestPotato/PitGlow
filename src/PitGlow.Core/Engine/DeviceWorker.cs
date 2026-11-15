@@ -47,6 +47,16 @@ public sealed class DeviceWorker
     public int SentFrames { get; private set; }
     public bool IsAlive => _thread.IsAlive;
 
+    /// <summary>One line for the log: control state, frames sent so far and the first LED's color.</summary>
+    public string Diagnostics()
+    {
+        Rgb[]? last;
+        lock (_gate) last = _lastSent;
+        string state = _session is null ? "not connected" : _backedOff ? "backed off" : _engaged ? "in control" : "connected, idle";
+        string color = last is { Length: > 0 } ? last[0].ToHex() : "-";
+        return $"{Info.Label}: {state}, {SentFrames} frames sent, LED 1 {color}{(Error is null ? "" : $", error: {Error}")}";
+    }
+
     public void Start() => _thread.Start();
 
     /// <summary>Queue a frame, or null to hand the device back (player left the car).</summary>

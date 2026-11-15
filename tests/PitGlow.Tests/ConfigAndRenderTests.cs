@@ -156,6 +156,138 @@ public class RenderTests
     }
 
     [Fact]
+    public void AllZonesModeShowsRpmEverywhereUntilAFlagComesOut()
+    {
+        var cfg = SettingsFile.Parse(SettingsFile.ToToml(_cfg));
+        cfg.Mode = "all";
+        var r = new Renderer(cfg);
+        var core = For("Corsair Commander Core");
+        var pump = core.Info.Zone("Pump")!.Leds;
+        var port1 = core.Info.Zone("Corsair Fan Header 1")!.Leds;
+        var gpu = For("MSI GeForce RTX 5090 VANGUARD SOC");
+        // No flag, at the shift point: fans, pump and GPU all show the shift color.
+        var shifting = new Sample("t") { Rpm = 8100, FirstRpm = 4000, ShiftRpm = 8000, MaxRpm = 8500 };
+        r.Update(shifting, 0.0);
+        var frame = r.Frame(core, shifting, 0.0);
+        Assert.All(port1, i => Assert.Equal(new Rgb(255, 0, 0), frame[i]));
+        Assert.All(pump, i => Assert.Equal(new Rgb(255, 0, 0), frame[i]));
+        Assert.Equal(new Rgb(255, 0, 0), r.Frame(gpu, shifting, 0.0)[0]);
+        // A flag comes out: every zone, fans included, shows the flag instead.
+        var yellow = shifting with { Flags = new HashSet<Flag> { Flag.Yellow } };
+        r.Update(yellow, 0.1);
+        frame = r.Frame(core, yellow, 0.1);
+        Assert.All(port1, i => Assert.Equal(new Rgb(255, 170, 0), frame[i]));
+        Assert.All(pump, i => Assert.Equal(new Rgb(255, 170, 0), frame[i]));
+        Assert.Equal(new Rgb(255, 170, 0), r.Frame(gpu, yellow, 0.1)[0]);
+        // The mode survives the settings file, and anything else is refused.
+        Assert.Equal("all", SettingsFile.Parse(SettingsFile.ToToml(cfg)).Mode);
+        Assert.Equal("traditional", SettingsFile.Parse("").Mode);
+        Assert.Throws<ConfigException>(() => SettingsFile.Parse("[lighting]\nmode = \"rainbow\"\n"));
+    }
+
+    [Theory]
+    [InlineData("traditional")]
+    [InlineData("all")]
+    public void HueLightsShowFlagsOnlyAndAreOffOtherwise(string mode)
+    {
+        var cfg = SettingsFile.Parse(SettingsFile.ToToml(_cfg));
+        cfg.Mode = mode;
+        var r = new Renderer(cfg);
+        var hue = new Layout(new DeviceCfg { Name = "Hue TV area", Backend = "hue", Role = Roles.Flags },
+            new PitGlow.Devices.DeviceInfo
+            {
+                Backend = "hue", Name = "Hue TV area", LedCount = 3,
+                Zones = [new("Lamp 1", 0, [0]), new("Lamp 2", 1, [1]), new("Strip", 2, [2])],
+                OriginalColors = [.. Enumerable.Repeat(new Rgb(9, 9, 9), 3)],
+            },
+            [new Group(Roles.Flags, [0, 1, 2])]);
+        // High revs, no flag (even in a game without flags): off, no gauge, no rev color.
+        var revs = new Sample("t") { Rpm = 7900, FirstRpm = 4000, ShiftRpm = 8000, MaxRpm = 8500 };
+        r.Update(revs, 0);
+        Assert.All(r.Frame(hue, revs, 0), c => Assert.Equal(Rgb.Off, c));
+        var rally = revs with { HasFlags = false };
+        Assert.All(r.Frame(hue, rally, 0.05), c => Assert.Equal(Rgb.Off, c));
+        // A flag comes out: every Hue light shows it.
+        var yellow = revs with { Flags = new HashSet<Flag> { Flag.Yellow } };
+        r.Update(yellow, 1.0);
+        Assert.All(r.Frame(hue, yellow, 1.0), c => Assert.Equal(new Rgb(255, 170, 0), c));
+        // It can be switched back to the normal rules.
+        Assert.False(SettingsFile.Parse("[hue]\nflags_only = false\n").HueFlagsOnly);
+        Assert.True(SettingsFile.Parse("").HueFlagsOnly);
+    }
+
+    [Fact]
+    public void WreckfestConfigEditingIsOffUnlessAskedFor()
+    {
+        Assert.False(SettingsFile.Parse("").Game.Wreckfest2ManageConfig);         // never touch the game's file by default
+        var cfg = SettingsFile.Parse("[game]\nwreckfest2_manage_config = true\n");
+        Assert.True(cfg.Game.Wreckfest2ManageConfig);
+        Assert.True(SettingsFile.Parse(SettingsFile.ToToml(cfg)).Game.Wreckfest2ManageConfig);
+    }
+
+    [Fact]
+    public void ICueUpdateRateDefaultsTo15AndSurvivesTheSettingsFile()
+    {
+        Assert.Equal(15.0, SettingsFile.Parse("").ICueMaxFps);                     // older files without it
+        var cfg = SettingsFile.Parse("[icue]\nmax_fps = 12\n");
+        Assert.Equal(12.0, cfg.ICueMaxFps);
+        Assert.Equal(12.0, SettingsFile.Parse(SettingsFile.ToToml(cfg)).ICueMaxFps);
+    }
+
+    [Fact]
+    public void AllZonesModeGivesEachRamStickItsOwnGaugeAndBlinksTogether()
+    {
+        var cfg = SettingsFile.Parse(SettingsFile.ToToml(_cfg));
+        cfg.Mode = "all";
+        var r = new Renderer(cfg);
+        var ram = For("Kingston Fury DDR5 DRAM");
+        var core = For("Corsair Commander Core");
+        var sticks = ram.Info.Zones.Where(z => z.Leds.Count > 0).ToList();
+        Assert.True(sticks.Count >= 2);
+        // Mid revs, no flag: both sticks show the same partly filled gauge.
+        var mid = new Sample("t") { Rpm = 6000, FirstRpm = 4000, ShiftRpm = 8000, MaxRpm = 8500 };
+        r.Update(mid, 0.0);
+        var frame = r.Frame(ram, mid, 0.0);
+        var first = sticks[0].Leds.Select(i => frame[i]).ToArray();
+        Assert.Contains(Rgb.Off, first);                                       // not full
+        Assert.Contains(first, c => c != Rgb.Off);                             // not empty
+        foreach (var stick in sticks.Skip(1))
+            Assert.Equal(first, stick.Leds.Select(i => frame[i]).ToArray());
+        // Checkered (swap): every LED on every device shows the same color at the same moment,
+        // starting with the first color when the flag appears, then all switch together.
+        var checkered = mid with { Flags = new HashSet<Flag> { Flag.Checkered } };
+        foreach (var (t, expected) in new[] { (5.0, new Rgb(255, 255, 255)), (5.3, Rgb.Off), (5.55, new Rgb(255, 255, 255)) })
+        {
+            r.Update(checkered, t);
+            Assert.All(r.Frame(ram, checkered, t), c => Assert.Equal(expected, c));
+            var coreFrame = r.Frame(core, checkered, t);
+            Assert.All(core.Groups.SelectMany(g => g.Leds), i => Assert.Equal(expected, coreFrame[i]));
+        }
+    }
+
+    [Fact]
+    public void AllZonesDemoShowsTheRpmGaugeOnFansMostOfTheTime()
+    {
+        var cfg = SettingsFile.Parse(SettingsFile.ToToml(_cfg));
+        cfg.Mode = "all";
+        var r = new Renderer(cfg);
+        var core = For("Corsair Commander Core");
+        var port1 = core.Info.Zone("Corsair Fan Header 1")!.Leds;
+        var demo = new PitGlow.Sources.DemoSource(flags: PitGlow.Sources.DemoSource.AllZonesFlags);
+        int gauge = 0, total = 0;
+        for (double t = 0; t < 36; t += 1.0 / 60)   // three RPM + flag cycles
+        {
+            var s = demo.Read(t);
+            r.Update(s, t);
+            var frame = r.Frame(core, s, t);
+            var tach = Effects.TachColors(port1.Count, s, cfg.Tach, t, 0, false, r.LearnedMax);
+            if (r.Flag is null && port1.Select((led, k) => frame[led] == tach[k]).All(x => x)) gauge++;
+            total++;
+        }
+        Assert.InRange((double)gauge / total, 0.55, 0.75);   // ~7 s of every 12 s: RPM sweeps
+    }
+
+    [Fact]
     public void NoFlagShowsOriginalColors()
     {
         var r = new Renderer(_cfg);

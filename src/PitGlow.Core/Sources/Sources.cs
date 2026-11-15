@@ -69,6 +69,13 @@ public sealed class DemoSource : ITelemetrySource
         _flags = flags;
     }
 
+    /// <summary>
+    /// Flag sequence for the all-zones demo: two empty 4 s slots (8 s of RPM on every zone)
+    /// before each flag, so the gauge is visible between flags despite the flag linger.
+    /// </summary>
+    public static readonly IReadOnlyList<Flag?> AllZonesFlags =
+        [.. Effects.DefaultPriority.Reverse().SelectMany(f => new Flag?[] { null, null, f })];
+
     public string Game => "demo";
 
     public Flag? CurrentFlag(double now)
@@ -108,7 +115,8 @@ public static class SourceFactory
             ["iracing"] = () => new IRacingSource(),
             ["acevo"] = () => new ACEvoSource(),
             ["acrally"] = () => new ACClassicSource(),
-            ["wreckfest2"] = () => new Wreckfest2Source(game.Wreckfest2Port, keeper: OperatingSystem.IsWindows() ? new Wreckfest2Config(game.Wreckfest2Port) : null),
+            ["wreckfest2"] = () => new Wreckfest2Source(game.Wreckfest2Port,
+                keeper: game.Wreckfest2ManageConfig && OperatingSystem.IsWindows() ? new Wreckfest2Config(game.Wreckfest2Port) : null),
             ["beamng"] = () => new BeamNGSource(game.BeamngPort),
         };
         if (game.Source == "auto") return new AutoSource([.. table.Values.Select(make => make())]);

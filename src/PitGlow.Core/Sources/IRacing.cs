@@ -38,6 +38,13 @@ public sealed partial class IRacingSource(IIRacingSdk? sdk = null) : ITelemetryS
         (Repair, Flag.Meatball),
     ];
 
+    /// <summary>
+    /// Telemetry frozen this long means the session is over (iRacing closes the sim when you leave
+    /// a race and starts a new one for the next). Let go of the old session's memory and variable
+    /// layout so the next race is read from scratch.
+    /// </summary>
+    public const double ResetAfterSeconds = 5.0;
+
     private readonly IIRacingSdk _sdk = sdk ?? new IRacingSharedMemory();
     private Dictionary<string, double?> _lights = [];
     private double? _infoChecked;
@@ -84,6 +91,13 @@ public sealed partial class IRacingSource(IIRacingSdk? sdk = null) : ITelemetryS
             _lastTick = snap.SessionTime;
             _lastChange = now;
         }
+        if (now - _lastChange > ResetAfterSeconds)
+        {
+            Engine.Log.Info("iRacing: telemetry stopped updating (session ended); reconnecting for the next one");
+            Close();
+            _nextAttempt = now + 1.0;
+            return null;
+        }
         if (now - _lastChange > 2 || !snap.IsOnTrack || snap.IsReplayPlaying) return null;
         if (_infoChecked is null || now - _infoChecked > 2)
         {
@@ -108,6 +122,7 @@ public sealed partial class IRacingSource(IIRacingSdk? sdk = null) : ITelemetryS
         try { _sdk.Shutdown(); } catch { /* ignore */ }
         _lastTick = null;
         _infoChecked = null;
+        _lights = [];
     }
 }
 

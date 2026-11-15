@@ -14,6 +14,7 @@ public abstract class KunosSource(Func<string, IMemoryBlock>? opener) : ITelemet
     private readonly Func<string, IMemoryBlock> _opener = opener ?? (name => new SharedBlock(name));
     private long? _lastPacket;
     private double _lastChange;
+    private bool _moved;
 
     protected abstract string Prefix { get; }
     public abstract string Game { get; }
@@ -34,6 +35,7 @@ public abstract class KunosSource(Func<string, IMemoryBlock>? opener) : ITelemet
         Graphics = graphics.Open() ? graphics : null;
         Static = stat.Open() ? stat : null;
         _lastPacket = null;
+        _moved = false;
         return true;
     }
 
@@ -49,12 +51,13 @@ public abstract class KunosSource(Func<string, IMemoryBlock>? opener) : ITelemet
     /// The physics page must keep changing; a closed or paused game leaves stale data.
     /// packetId is the usual heartbeat, but AC Rally doesn't always advance it, so any
     /// change in the first 64 bytes (packet, pedals, gear, rpm, speed, velocity, g-forces)
-    /// counts as a beat too.
+    /// counts as a beat too. Nothing counts as live until the page has moved since it was
+    /// opened: other apps (SimHub, motion software) can keep a closed game's block alive.
     /// </summary>
     private bool Fresh(double now)
     {
         long beat = Heartbeat(Physics!);
-        if (_lastPacket is null)   // need to see it move at least once
+        if (_lastPacket is null)
         {
             _lastPacket = beat;
             _lastChange = now;
@@ -64,6 +67,7 @@ public abstract class KunosSource(Func<string, IMemoryBlock>? opener) : ITelemet
         {
             _lastPacket = beat;
             _lastChange = now;
+            _moved = true;
             return true;
         }
         if (now - _lastChange > StaleSeconds)
@@ -71,7 +75,7 @@ public abstract class KunosSource(Func<string, IMemoryBlock>? opener) : ITelemet
             Close();   // release our handle so the block can go away
             return false;
         }
-        return true;
+        return _moved;
     }
 
     internal static long Heartbeat(IMemoryBlock physics)

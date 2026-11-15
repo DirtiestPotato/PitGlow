@@ -13,6 +13,7 @@ public sealed class BackendSet(IReadOnlyList<IBackend> backends)
     public static readonly IReadOnlyDictionary<string, string> VendorOf = new Dictionary<string, string>
     {
         ["icue"] = "1B1C",    // Corsair
+        ["corsairhub"] = "1B1C",
         ["razer"] = "1532",   // Razer
     };
 

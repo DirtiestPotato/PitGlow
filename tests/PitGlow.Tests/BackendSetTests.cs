@@ -108,6 +108,40 @@ public class BackendSetTests
         Assert.True(server.Devices[3].WriteCount > 0);   // ... but still drove the RAM
     }
 
+    /// <summary>Drives, goes quiet long enough to count as "not driving", then drives again.</summary>
+    private sealed class OnOffSource : PitGlow.Sources.ITelemetrySource
+    {
+        private readonly PitGlow.Sources.DemoSource _demo = new(flagSeconds: 0.3, flags: [null]);
+        private double? _start;
+        public string Game => "test";
+        public Sample? Read(double now)
+        {
+            _start ??= now;
+            double t = now - _start.Value;
+            return t < 0.4 || t > 3.0 ? _demo.Read(now) : null;
+        }
+        public void Close() { }
+    }
+
+    [Theory]
+    [InlineData(true, 7)]    // held from the first race until PitGlow stops: taken once
+    [InlineData(false, 14)]  // handed back while not driving, taken again for the next stint
+    public void ICueDevicesAreHeldUntilPitGlowStops(bool hold, int expectedAcquires)
+    {
+        var icue = new FakeBackend("icue", FakeBackend.CorsairViaICue());
+        var set = new BackendSet([icue]);
+        var devices = set.Discover(TimeSpan.FromSeconds(2)).Devices;
+        var cfg = Suggest.Config(devices);
+        cfg.ICueHoldControl = hold;
+        var plan = Layouts.Build(cfg, devices);
+        new Runner(cfg, new OnOffSource(), set.OpenSession, plan.Layouts, null).Run(CancellationToken.None, seconds: 3.8);
+        lock (icue.Writes)
+        {
+            Assert.Equal(expectedAcquires, icue.Acquired);
+            Assert.Equal(icue.Acquired, icue.Released);   // all handed back once PitGlow stops
+        }
+    }
+
     [Fact]
     public void BackendIsSavedPerDevice()
     {

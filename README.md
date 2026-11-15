@@ -29,19 +29,26 @@ PitGlow watches for all of them and follows whichever one you're driving.
 4. Double-click **Demo.bat** to check everything: a fake rev sweep on the fans and every flag in turn.
 5. To race, double-click **PitGlow.bat** and leave it running. Press Ctrl+C or close the window to stop; your lighting is restored either way.
 
-**Devices.bat** lists everything OpenRGB reports, with each zone's LED count.
+**Devices.bat** lists every device PitGlow can drive, with each zone's LED count.
+
+**All Zones mode:** double-click **AllZones.bat** (or **AllZonesDemo.bat** to try it) and every device becomes an RPM gauge; when a flag comes out, everything shows the flag, blinking in sync. Set it permanently with `mode = "all"` under `[lighting]`.
 
 ### Wreckfest 2
-In `Documents\My Games\Wreckfest 2\<your id>\savegame\telemetry\config.json`, add an entry to the `udp` list for PitGlow on port `23124`. Keep any existing entry (port 23123 is what motion rigs, Sim Racing Studio and SimHub use): the game sends to every entry, so both get the data.
+PitGlow listens for Wreckfest 2 telemetry on UDP port `23124`. The game's telemetry list is `Documents\My Games\Wreckfest 2\<your id>\savegame\telemetry\config.json`, and the game only sends to entries with `"enabled": 1`.
+
+**With a motion rig (Sim Racing Studio, SimHub, ...):** leave the game's file to your motion software and have it pass the data on. In Sim Racing Studio: Wreckfest 2's **Game UDP Listening Port** screen → **Port Forwarding** → IP `127.0.0.1`, port `23124` → **Add** → **Confirm** → **Save**.
+
+> Sim Racing Studio (as of 2026.10.13) switches its Wreckfest 2 entry on as the game starts and back off about 10 seconds later, but the game reads the list after that, so neither the rig nor PitGlow gets data. Fix: set `"enabled": 1` on its `23123` entry in **both** `config.json` and Sim Racing Studio's backup `config_srs_bck.json` in the same folder.
+
+**Without motion software:** point the game straight at PitGlow:
 
 ```json
 "udp": [
-    { "enabled": 1, "ip": "127.0.0.1", "port": "23123" },
     { "enabled": 1, "ip": "127.0.0.1", "port": "23124" }
 ],
 ```
 
-Motion software such as Sim Racing Studio rewrites this file with only its own entry each time it starts. While PitGlow is running it adds its entry back automatically (and never touches the others), so start your motion software, then PitGlow, then the game.
+Restart Wreckfest 2 after changing the file. If PitGlow says *"Wreckfest 2 is running but no telemetry reaches PitGlow"*, the game isn't sending to port 23124.
 
 ### BeamNG.drive
 Options → Other → Protocols → turn on **OutGauge UDP**, IP `127.0.0.1`, port `4444`.
@@ -67,6 +74,18 @@ Uses the same fast "Entertainment" streaming Hue Sync uses.
 3. **Demo.bat** to see every flag on the lights, then **PitGlow.bat** and race.
 
 Only one app can stream to a Hue area at a time. If iCUE's Philips Hue integration (or Hue Sync) is on, turn it off while racing, or give PitGlow its own Entertainment area. When PitGlow stops, the lights go back to how they were.
+
+## Corsair Elite Capellix coolers (Commander Core hub)
+
+PitGlow drives the Commander Core hub that comes with iCUE Elite Capellix coolers **directly, without iCUE or OpenRGB**: the pump ring and each fan show up as their own device. PitGlow only sends colors. Fan and pump speeds keep following the curves saved on the hub the whole time, even if PitGlow crashes.
+
+1. Once, in iCUE: open the cooler, switch on **Device Memory Mode**, pick your fan and pump presets under **Cooling**, and click **Save Changes**. The hub now runs its own cooling with no software.
+2. Close iCUE completely (tray icon > Quit), and turn off its startup in **Task Manager > Startup apps**. PitGlow leaves the hub alone while iCUE is running.
+3. Run **Setup.bat** (or **Devices.bat** to check): you should see `Corsair Pump` and `Corsair Fan 1`…`6`.
+
+While PitGlow drives the hub it logs fan and pump speeds and coolant temperature to `pitglow.log` every minute, and hands the hub back if the pump stops or the coolant passes 55 °C. When PitGlow closes, the hub goes back to its own lighting.
+
+Tested on an H150i Elite Capellix XT hub (USB `1B1C:0C32`, firmware 2.0.19). The original Commander Core (`1B1C:0C1C`) uses the same protocol but hasn't been tested yet: reports welcome. To use iCUE instead, set `enabled = false` under `[corsair_hub]` and `enabled = true` under `[icue]`.
 
 ## What's different from the Python version
 
@@ -97,6 +116,9 @@ Every push to `main` is built and tested on Windows by GitHub Actions; the ready
 
 - `src/PitGlow.Core`: game readers, lighting effects, settings, the device model and the backend contract.
 - `src/PitGlow.OpenRgb`: the OpenRGB backend (its own SDK client, protocol v3).
+- `src/PitGlow.CorsairHub`: Corsair Commander Core hubs over raw HID.
+- `src/PitGlow.RgbNet`: Corsair iCUE and Razer Chroma through RGB.NET.
+- `src/PitGlow.Hue`, `src/PitGlow.HueBluetooth`: Philips Hue through the bridge or Bluetooth.
 - `src/PitGlow.Cli`: `PitGlow.exe`.
 - `tests/`: runs everything against a fake OpenRGB server shaped like a real rig.
 

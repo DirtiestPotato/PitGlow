@@ -1,5 +1,6 @@
 using PitGlow.Backends;
 using PitGlow.Devices;
+using PitGlow.Engine;
 using RGB.NET.Core;
 using RGB.NET.Devices.Corsair;
 using RGB.NET.Devices.Razer;
@@ -18,8 +19,17 @@ public sealed class RgbNetBackend : IBackend
     private readonly Func<bool, AbstractRGBDeviceProvider> _providerFor;
     private readonly object _gate = new();
     private AbstractRGBDeviceProvider? _provider;
+    private AbstractRGBDeviceProvider? _subscribed;
     private bool _exclusive;
     private int _acquired;
+    private volatile bool _initializing;
+    private readonly UpdateErrors _errors = new();
+    private Timer? _logTimer;
+    private ICueLogWatcher? _logWatcher;
+    private double _lastLogReconnect = double.NegativeInfinity;
+
+    /// <summary>Least time between reconnects triggered by iCUE's log, so it can never loop.</summary>
+    public static double LogReconnectGapSeconds { get; set; } = 20.0;
 
     private RgbNetBackend(string id, string displayName, Func<bool, AbstractRGBDeviceProvider> providerFor)
     {
@@ -53,9 +63,16 @@ public sealed class RgbNetBackend : IBackend
         if (_provider is not null && _exclusive == exclusive && _provider.IsInitialized) return _provider;
         Close();
         var provider = _providerFor(exclusive);
+        if (!ReferenceEquals(_subscribed, provider))
+        {
+            provider.Exception += OnProviderException;
+            _subscribed = provider;
+        }
+        _errors.Reset();
         var console = Console.Out;
         try
         {
+            _initializing = true;
             Console.SetOut(TextWriter.Null);   // the SDK wrapper prints debug lines
             if (!provider.Initialize(RGBDeviceType.All, throwExceptions: true))
                 throw new BackendException($"{DisplayName} did not start");
@@ -67,6 +84,7 @@ public sealed class RgbNetBackend : IBackend
         }
         finally
         {
+            _initializing = false;
             Console.SetOut(console);
         }
         _provider = provider;
@@ -78,6 +96,20 @@ public sealed class RgbNetBackend : IBackend
     {
         try { _provider?.Dispose(); } catch { /* ignore */ }
         _provider = null;
+    }
+
+    /// <summary>
+    /// A failed update (iCUE rejected a write) must not be rethrown once running: RGB.NET would
+    /// rethrow it on its update thread, which ends that thread for good and freezes the lights
+    /// with no error anywhere. Skip the frame instead (the next one resends every LED) and let
+    /// Write reconnect if the failures keep coming.
+    /// </summary>
+    private void OnProviderException(object? sender, ExceptionEventArgs e)
+    {
+        if (_initializing) return;   // startup failures still surface as exceptions
+        e.Throw = false;
+        if (_errors.Add(Clock.Now, e.Exception.GetBaseException().Message))
+            Log.Warn($"{DisplayName}: update failed: {_errors.LastMessage}");
     }
 
     private static T WithTimeout<T>(Func<T> work, TimeSpan timeout, string name)
@@ -221,8 +253,34 @@ public sealed class RgbNetBackend : IBackend
     {
         lock (_gate)
         {
-            if (_acquired == 0) Open(exclusive: true);
+            if (_acquired == 0 || _provider is null) Open(exclusive: true);
             _acquired++;
+            if (Id == "icue" && _logTimer is null)
+            {
+                _logWatcher = new ICueLogWatcher();
+                _logWatcher.Poll();   // start at the end of iCUE's current log
+                _logTimer = new Timer(_ => CheckICueLog(), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+            }
+        }
+    }
+
+    /// <summary>
+    /// When the hub drops a lighting write, iCUE's lighting for it can stall for good while still
+    /// taking our colors. Drop the SDK session so the device workers reconnect (a short blink)
+    /// and iCUE starts a fresh lighting stream.
+    /// </summary>
+    private void CheckICueLog()
+    {
+        int dropped;
+        try { dropped = _logWatcher?.Poll() ?? 0; } catch { return; }
+        if (dropped == 0) return;
+        lock (_gate)
+        {
+            double now = Clock.Now;
+            if (_acquired == 0 || _provider is null || now - _lastLogReconnect < LogReconnectGapSeconds) return;
+            _lastLogReconnect = now;
+            Log.Warn($"{DisplayName}: the Corsair hub ignored {dropped} lighting write(s) (iCUE log); reconnecting so iCUE's lighting doesn't stall");
+            Close();
         }
     }
 
@@ -240,6 +298,16 @@ public sealed class RgbNetBackend : IBackend
     {
         lock (_gate)
         {
+            if (_errors.TooMany(Clock.Now))
+            {
+                // iCUE keeps refusing (lost control, restarted, hub busy): start a fresh SDK
+                // session. Every device using it fails over and the workers reconnect shortly.
+                var reason = _errors.LastMessage;
+                Log.Warn($"{DisplayName} keeps rejecting updates ({reason}); reconnecting");
+                Close();
+                _errors.Reset();
+                throw new BackendException($"{DisplayName} stopped accepting colors ({reason}); reconnecting");
+            }
             var device = Find(info);
             var leds = device.OrderBy(l => (int)l.Id).ToList();
             if (leds.Count != frame.Count)
@@ -247,6 +315,50 @@ public sealed class RgbNetBackend : IBackend
             for (int i = 0; i < leds.Count; i++)
                 leds[i].Color = new Color(frame[i].R, frame[i].G, frame[i].B);
             device.Update(flushLeds: true);
+        }
+    }
+
+    /// <summary>Recent update failures; too many inside the window means the session is broken.</summary>
+    public sealed class UpdateErrors(int limit = 5, double windowSeconds = 3.0)
+    {
+        private readonly Queue<double> _times = new();
+        private readonly object _lock = new();
+
+        public string? LastMessage { get; private set; }
+
+        /// <summary>Record a failure; true when it starts a new burst (worth logging).</summary>
+        public bool Add(double now, string message)
+        {
+            lock (_lock)
+            {
+                Trim(now);
+                _times.Enqueue(now);
+                LastMessage = message;
+                return _times.Count == 1;
+            }
+        }
+
+        public bool TooMany(double now)
+        {
+            lock (_lock)
+            {
+                Trim(now);
+                return _times.Count >= limit;
+            }
+        }
+
+        public void Reset()
+        {
+            lock (_lock)
+            {
+                _times.Clear();
+                LastMessage = null;
+            }
+        }
+
+        private void Trim(double now)
+        {
+            while (_times.Count > 0 && now - _times.Peek() > windowSeconds) _times.Dequeue();
         }
     }
 

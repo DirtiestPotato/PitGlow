@@ -56,6 +56,12 @@ public sealed class GameCfg
     public static readonly string[] Sources = ["auto", "iracing", "acevo", "acrally", "wreckfest2", "beamng", "demo"];
     public string Source { get; set; } = "auto";
     public int Wreckfest2Port { get; set; } = 23124;   // 23123 is left to motion rigs / SimHub
+    /// <summary>
+    /// Let PitGlow add its entry to Wreckfest 2's telemetry list. Off by default: motion software
+    /// backs that file up and restores it, so PitGlow's edits end up in its backup. With a motion
+    /// rig, forward from the motion software to PitGlow's port instead.
+    /// </summary>
+    public bool Wreckfest2ManageConfig { get; set; }
     public int BeamngPort { get; set; } = 4444;
 }
 
@@ -65,10 +71,32 @@ public sealed class Settings
     public int Port { get; set; } = 6742;
     public bool OpenRgbEnabled { get; set; } = true;
     public bool ICueEnabled { get; set; } = true;
+    /// <summary>
+    /// Cap on updates per second for each iCUE device. A Commander Core's fans and pump all share
+    /// one small hub, which starts dropping writes when iCUE is pushed too hard.
+    /// </summary>
+    public double ICueMaxFps { get; set; } = 15.0;
+    /// <summary>
+    /// Keep iCUE devices from the first race until PitGlow closes, instead of handing them back to
+    /// iCUE whenever the game pauses or loses focus (the back-and-forth can stall iCUE).
+    /// </summary>
+    public bool ICueHoldControl { get; set; } = true;
+    /// <summary>
+    /// Drive Corsair Commander Core hubs (Elite Capellix coolers) directly, without iCUE. Only
+    /// colors are sent; the hub keeps running the fan and pump curves saved in its memory.
+    /// </summary>
+    public bool CorsairHubEnabled { get; set; } = true;
     public bool RazerEnabled { get; set; } = true;
     public HueCfg Hue { get; set; } = new();
+    /// <summary>Hue lights (Bridge and Bluetooth) show flags only and stay off when no flag is out.</summary>
+    public bool HueFlagsOnly { get; set; } = true;
     public bool HueBluetoothEnabled { get; set; } = true;
     public GameCfg Game { get; set; } = new();
+    /// <summary>
+    /// "traditional": each zone follows its role (tach or flags).
+    /// "all": every zone shows the RPM gauge, and every zone shows the flag while one is out.
+    /// </summary>
+    public string Mode { get; set; } = "traditional";
     public TachStyle Tach { get; set; } = new();
     public double FlagBrightness { get; set; } = 1.0;
     public string WhenClear { get; set; } = "original";   // original | off | #RRGGBB

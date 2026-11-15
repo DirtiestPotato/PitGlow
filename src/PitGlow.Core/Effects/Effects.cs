@@ -203,7 +203,8 @@ public static class Effects
         return Enumerable.Repeat(color.Scale(style.Brightness), n).ToArray();
     }
 
-    public static Rgb[] FlagColors(FlagStyle style, int n, double now, double brightness = 1.0)
+    /// <param name="together">swap pattern: the whole device changes color at once instead of neighbouring LEDs alternating.</param>
+    public static Rgb[] FlagColors(FlagStyle style, int n, double now, double brightness = 1.0, bool together = false)
     {
         if (n <= 0) return [];
         var first = style.Colors[0];
@@ -225,7 +226,7 @@ public static class Effects
                 // On a single-LED device this alternates the whole device over time.
                 IReadOnlyList<Rgb> colors = style.Colors.Count > 1 ? style.Colors : [first, Rgb.Off];
                 int phase = Square(now, style.Hz) ? 0 : 1;
-                for (int i = 0; i < n; i++) output[i] = colors[(i + phase) % colors.Count];
+                for (int i = 0; i < n; i++) output[i] = colors[((together ? 0 : i) + phase) % colors.Count];
                 break;
         }
         for (int i = 0; i < n; i++) output[i] = output[i].Scale(brightness);
@@ -249,6 +250,9 @@ public sealed class FlagSelector(IReadOnlyList<Flag> priority, IReadOnlyDictiona
         _since.Clear();
         _lastSeen.Clear();
     }
+
+    /// <summary>When the flag last appeared (after a gap longer than the linger).</summary>
+    public double SinceOf(Flag flag) => _since[flag];
 
     public Flag? Update(IEnumerable<Flag> flags, double now)
     {
