@@ -83,23 +83,27 @@ public sealed class Wreckfest2Config(int port, Func<IEnumerable<string>>? files 
             const int attempts = 40;   // up to a second: the writer (or a reader) may hold the file briefly
             for (int attempt = 0; attempt < attempts; attempt++)
             {
-                if (Fix(path, _lastNow, quiet: attempt < attempts - 1)) return;
+                if (Fix(path, _lastNow, quiet: attempt < attempts - 1, changed: true)) return;
                 await Task.Delay(25);
             }
         });
     }
 
     /// <summary>Put PitGlow's entry back in one file if it's missing. False when the file was busy.</summary>
-    private bool Fix(string path, double now, bool quiet = false)
+    /// <remarks>
+    /// <paramref name="changed"/>: the watcher saw a write, so read the file even if its timestamp
+    /// looks the same (timestamps only move every ~15 ms, and the rewrite can land in the same tick).
+    /// </remarks>
+    private bool Fix(string path, double now, bool quiet = false, bool changed = false)
     {
         lock (_lock)
         {
             try
             {
                 var stamp = File.GetLastWriteTimeUtc(path);
-                if (_state.TryGetValue(path, out var st) && st.Seen == stamp) return true;
+                if (_state.TryGetValue(path, out var st) && st.Seen == stamp && !changed) return true;
                 if (_state.TryGetValue(path, out st) && st.WrittenAt is double w && now - w < MinRewrite.TotalSeconds) return true;
-                var text = File.ReadAllText(path);
+                var text = ReadShared(path);
                 var fixedText = Ensure(text, port);
                 if (fixedText is null)
                 {
@@ -117,6 +121,14 @@ public sealed class Wreckfest2Config(int port, Func<IEnumerable<string>>? files 
                 return false;
             }
         }
+    }
+
+    /// <summary>Read without locking the motion software or the game out of writing the file.</summary>
+    private static string ReadShared(string path)
+    {
+        using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        using var reader = new StreamReader(fs);
+        return reader.ReadToEnd();
     }
 
     /// <summary>
